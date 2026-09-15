@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: funnel_app
+      POSTGRES_PASSWORD: funnel_dev_password
+      POSTGRES_DB: funnel_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - funnel_pg_data:/var/lib/postgresql/data
+
+volumes:
+  funnel_pg_data:

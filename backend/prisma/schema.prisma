@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  admin
+  manager
+  sales
+  seo
+}
+
+enum UserStatus {
+  active
+  invited
+  disabled
+}
+
+enum WebsiteStatus {
+  connected
+  error
+  pending
+}
+
+enum SyncScope {
+  traffic
+  keywords
+}
+
+enum SyncStatus {
+  success
+  failed
+  running
+}
+
+enum LeadChannel {
+  form_web
+  zalo
+  fanpage
+  hotline
+  chat
+}
+
+enum LeadStatus {
+  moi
+  dang_cham_soc
+  da_chuyen_don
+  huy
+}
+
+enum OrderStatus {
+  cho_xu_ly
+  da_giao
+  huy
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         Role
+  team         String?
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  salesLeads    Lead[]     @relation("LeadSalesRep")
+  createdLeads  Lead[]     @relation("LeadCreatedBy")
+  salesOrders   Order[]    @relation("OrderSalesRep")
+  createdOrders Order[]    @relation("OrderCreatedBy")
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Website {
+  id          String        @id @default(cuid())
+  name        String
+  domain      String        @unique
+  gscProperty String        @map("gsc_property")
+  status      WebsiteStatus @default(pending)
+  // Link "Publish to web" (CSV) từ Google Sheet dùng add-on Search Analytics
+  // for Sheets - thay cho gọi trực tiếp GSC API (tránh phải tạo GCP project).
+  trafficCsvUrl  String?     @map("traffic_csv_url")
+  keywordsCsvUrl String?     @map("keywords_csv_url")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  dailyTraffic GscDailyTraffic[]
+  keywords     GscKeyword[]
+  leads        Lead[]
+  orders       Order[]
+  syncLogs     SyncLog[]
+
+  @@map("websites")
+}
+
+model GscDailyTraffic {
+  id          String  @id @default(cuid())
+  websiteId   String  @map("website_id")
+  date        DateTime @db.Date
+  clicks      Int
+  impressions Int
+  ctr         Float
+  position    Float
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, date])
+  @@index([websiteId, date])
+  @@map("gsc_daily_traffic")
+}
+
+model GscKeyword {
+  id             String   @id @default(cuid())
+  websiteId      String   @map("website_id")
+  rangeStart     DateTime @db.Date @map("range_start")
+  rangeEnd       DateTime @db.Date @map("range_end")
+  query          String
+  clicks         Int
+  impressions    Int
+  ctr            Float
+  position       Float
+  syncedAt       DateTime @default(now()) @map("synced_at")
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  // Bảng lưu snapshot hiện tại (cửa sổ trượt 28 ngày), không lưu lịch sử từng ngày -
+  // nên khoá duy nhất chỉ theo (website, từ khoá), mỗi lần sync ghi đè snapshot cũ.
+  @@unique([websiteId, query])
+  @@map("gsc_keywords")
+}
+
+model Lead {
+  id           String      @id @default(cuid())
+  date         DateTime    @db.Date
+  websiteId    String      @map("website_id")
+  customerName String      @map("customer_name")
+  contact      String
+  channel      LeadChannel
+  interest     String
+  salesRepId   String      @map("sales_rep_id")
+  status       LeadStatus  @default(moi)
+  note         String?
+  createdById  String      @map("created_by_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+
+  website   Website @relation(fields: [websiteId], references: [id])
+  salesRep  User    @relation("LeadSalesRep", fields: [salesRepId], references: [id])
+  createdBy User    @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  orders    Order[]
+
+  @@index([websiteId, date])
+  @@index([status])
+  @@index([salesRepId])
+  @@map("leads")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  date       DateTime    @db.Date
+  leadId     String?     @map("lead_id")
+  websiteId  String      @map("website_id")
+  value      Int
+  product    String
+  salesRepId String      @map("sales_rep_id")
+  status     OrderStatus @default(cho_xu_ly)
+  createdById String     @map("created_by_id")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  deletedAt  DateTime?   @map("deleted_at")
+
+  website   Website @relation(fields: [websiteId], references: [id])
+  lead      Lead?   @relation(fields: [leadId], references: [id])
+  salesRep  User    @relation("OrderSalesRep", fields: [salesRepId], references: [id])
+  createdBy User    @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  @@index([websiteId, date])
+  @@index([status])
+  @@index([salesRepId])
+  @@map("orders")
+}
+
+model SyncLog {
+  id        String     @id @default(cuid())
+  websiteId String     @map("website_id")
+  scope     SyncScope
+  status    SyncStatus
+  rows      Int        @default(0)
+  message   String?
+  runAt     DateTime   @default(now()) @map("run_at")
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId, runAt])
+  @@map("sync_logs")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  entityType String      @map("entity_type") // "lead" | "order"
+  entityId   String      @map("entity_id")
+  action     AuditAction
+  field      String?
+  oldValue   String?     @map("old_value")
+  newValue   String?     @map("new_value")
+  changedById String     @map("changed_by_id")
+  changedAt  DateTime    @default(now()) @map("changed_at")
+
+  changedBy User @relation(fields: [changedById], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
