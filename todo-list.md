@@ -75,19 +75,45 @@
 - [x] `PATCH /websites/:id` (mới) — admin nhập link CSV, tự test link còn sống không, set trạng thái connected/error
 - [x] **Đã test bằng dữ liệu thật 100%** với website thí điểm `gomkientrucviet.vn`: 30 dòng traffic + 1.610 từ khóa đồng bộ đúng, số liệu chính xác kể cả các trường hợp impressions lớn dễ parse sai
 
-### Phase 3.1 — Sự cố "không cập nhật mỗi ngày" & đổi hướng sang Apps Script webhook ✅ xong phần code, chờ bạn cài đặt
+### Phase 3.1 — Sự cố "không cập nhật mỗi ngày" & thử đổi hướng sang Apps Script webhook ❌ bỏ (chặn bởi GCP), xem Phase 3.3 cho hướng thay thế
 
 **Sự cố phát hiện (15/09/2026):** dù `sync_logs` báo thành công liên tục nhiều ngày, dữ liệu `gsc_daily_traffic` của `quatangsg.vn` đứng im ở ngày 06/09 — đúng như rủi ro đã ghi ở mục trên: add-on "Search Analytics for Sheets" bản free **không tự refresh** Sheet, nên backend chỉ đang tải đi tải lại cùng CSV cũ. Thêm vào đó, cron 2h sáng chỉ chạy khi backend đang chạy đúng lúc đó — mà Phase 6 (deploy VPS 24/7) vẫn chưa làm, nên có những ngày cron không chạy lần nào.
 
-**Đổi hướng:** bỏ trung gian Sheet + CSV, dùng **Google Apps Script gọi thẳng Search Console API** (Advanced Service có sẵn trong Apps Script, chạy trên project ẩn riêng — vẫn **không cần** tạo GCP project/thẻ tín dụng, giữ đúng quyết định ở Phase 0) rồi đẩy data qua webhook mới của backend. Apps Script tự chạy bằng trigger hằng ngày của Google, độc lập với việc backend/Sheet có "sống" đúng giờ hay không.
+**Đổi hướng (thử):** bỏ trung gian Sheet + CSV, dùng **Google Apps Script gọi thẳng Search Console API** rồi đẩy data qua webhook mới của backend.
 
-- [x] `POST /api/gsc/ingest` (`backend/src/gsc/gsc-ingest.controller.ts`) — nhận `{siteUrl, traffic[], keywords[], keywordsRangeStart, keywordsRangeEnd}`, xác thực bằng header `x-api-key` (`ApiKeyGuard`, không qua JWT người dùng), khớp website theo `gsc_property`
-- [x] `GscSyncService` refactor: tách logic upsert dùng chung (`applyTraffic`/`applyKeywords`) cho cả đường CSV cũ và đường webhook mới (`ingestTraffic`/`ingestKeywords`) — CSV path giữ nguyên, chưa xoá, dùng làm phương án dự phòng cho site nào chưa kịp chuyển
+- [x] `POST /api/gsc/ingest` (`backend/src/gsc/gsc-ingest.controller.ts`) — nhận `{siteUrl, traffic[], keywords[], keywordsRangeStart, keywordsRangeEnd}`, xác thực bằng header `x-api-key` (`ApiKeyGuard`, không qua JWT người dùng), khớp website theo `gsc_property`. **Vẫn giữ lại** — dùng chung với Phase 3.2 (upload thủ công), không phí công dù bỏ hướng Apps Script.
+- [x] `GscSyncService` refactor: tách logic upsert dùng chung (`applyTraffic`/`applyKeywords`) cho cả đường CSV, webhook, và sau này là upload thủ công (`ingestTraffic`/`ingestKeywords`)
 - [x] Thêm `GSC_INGEST_API_KEY` vào `.env`/`.env.example`
-- [x] Script mẫu `backend/scripts/gsc-apps-script/Code.gs` + hướng dẫn cài đặt `README.md` cùng thư mục
+- [x] Script mẫu `backend/scripts/gsc-apps-script/Code.gs` + `README.md`, `appsscript.json` — **đã sửa 1 lần** vì đoán sai: Search Console API không nằm trong "Advanced Services" có sẵn của Apps Script như tưởng, phải gọi thẳng REST bằng `ScriptApp.getOAuthToken()` + khai báo `oauthScopes` trong manifest
 - [x] Đã test đầu-cuối bằng curl (thiếu key → 401, sai site → 404, đúng → 201 và ghi đúng DB) trên website `quatangsg.vn`
-- [ ] **Bạn cần làm** (thao tác trên Google account của bạn, ngoài khả năng thao tác thay): làm theo `backend/scripts/gsc-apps-script/README.md` — dán script vào script.google.com, bật Advanced Service "Search Console API", điền `backendUrl` (cần domain public — chờ Phase 6 hoặc dùng ngrok tạm) + `apiKey`, chạy thử, đặt trigger hằng ngày
-- [ ] Sau khi xác nhận chạy ổn với `quatangsg.vn`: xoá `trafficCsvUrl`/`keywordsCsvUrl` của site đó (tránh cron CSV cũ ghi đè lại bằng data Sheet đã ngừng refresh), rồi lặp lại Apps Script cho từng site trong **11 website còn lại** thay vì setup Sheet CSV như dự định trước đây
+- [x] **❌ Bế tắc thật khi chạy với site thật:** gọi Search Console API từ project ẩn mặc định của Apps Script → lỗi `SERVICE_DISABLED` (API chưa bật), nhưng project ẩn đó **không cho vào Cloud Console để bật** (lỗi "insufficient permissions", kể cả đúng tài khoản chủ). Theo tài liệu Google, cách chính thức là đổi Apps Script sang 1 GCP project tự tạo — nhưng **tạo project mới trên tài khoản này bị Google yêu cầu xác minh thẻ thanh toán ngay bước tạo**, đúng rào cản đã né từ Phase 0. → **Dừng hẳn hướng Apps Script**, không phải do code sai mà do chính sách tài khoản Google, không có cách vượt qua mà không đụng billing.
+
+---
+
+### Phase 3.2 — Upload CSV thủ công (giải pháp chữa cháy, không tự động) ✅ code xong, hoạt động, **giữ làm công cụ dự phòng**
+
+Sau khi Phase 3.1 bế tắc, làm tạm 1 đường "chắc chắn chạy" trong lúc tìm hướng tự động thật: admin export CSV trực tiếp từ giao diện Search Console (Performance → Export → CSV) rồi upload tay qua app. **Lưu ý: không giải quyết được yêu cầu gốc "tự động mỗi ngày"** — chỉ hữu ích khi cần dữ liệu gấp hoặc làm phương án dự phòng khi Phase 3.3 bên dưới gặp sự cố.
+
+- [x] `GscSheetsService`: tách hàm parse CSV thuần (`parseTrafficRows`/`parseKeywordRows`) dùng chung cho URL-fetch lẫn file-upload; thêm khớp cột "khoan dung" (`findColumn` — thử tên chính xác trước, không có thì thử khớp gần đúng) vì tiêu đề CSV export trực tiếp từ GSC có thể ghi khác 1 chút (vd "Top queries" thay vì "Query")
+- [x] `POST /websites/:id/gsc-upload` (`backend/src/websites/websites.controller.ts`) — nhận multipart 2 file (`traffic`, `keywords`) + query `rangeStart`/`rangeEnd`, admin-only, tái dùng `ingestTraffic`/`ingestKeywords`
+- [x] UI: nút "Tải lên CSV" ở **Quản trị → Website** (`app/src/pages/admin/Websites.tsx`) — modal chọn 2 file + chỉnh khoảng ngày cho từ khoá
+- [x] Đã test parse logic với file mẫu (kể cả header biến thể "Top queries") — chạy đúng
+- [ ] **Chưa test thật** đường HTTP đầy đủ qua UI (chỉ test logic parse trực tiếp, chưa bấm nút thật trong browser với file GSC thật) — nên test lại nếu định dùng công cụ này
+
+---
+
+### Phase 3.3 — Quay lại add-on Sheet, dùng tính năng lịch tự động có sẵn ✅ **hướng chính thức, đã xác nhận hoạt động**
+
+Kiểm tra lại kỹ hơn thay vì bỏ cuộc: add-on "Search Analytics for Sheets" bản **Free thực sự có tính năng "Scheduled Reports"** chạy **Daily** tự động (đã xác nhận bằng ảnh chụp thật từ add-on, không phải đoán) — vấn đề ban đầu ở Phase 3.1 chỉ là chưa bật đúng tính năng này. Không đụng GCP, không cần Apps Script, giải quyết đúng gốc rễ yêu cầu "tự động mỗi ngày".
+
+**Giới hạn phát hiện khi làm thật:** bản Free chỉ cho **1 lịch / 1 spreadsheet** (không có nút "thêm lịch thứ 2" trong cùng 1 sheet). → **Mỗi website cần 2 Google Sheet riêng** (1 sheet cho report Traffic, 1 sheet cho report Keywords), mỗi sheet tự làm 1 report + 1 lịch Daily riêng, publish CSV riêng — vẫn dán được vào đúng 2 ô `trafficCsvUrl`/`keywordsCsvUrl` sẵn có của website, không cần sửa code.
+
+- [x] Đã dựng thật 2 spreadsheet mẫu cho site test `fromthestress.vn`, xác nhận "Report frequency: Daily (runs every day)" khả dụng trên Plan Free, và "Results Sheet" ở mode **Replace** đúng đè lên đúng tab (không tạo tab rác mỗi ngày)
+- [x] Thêm website `From The Stress` (domain `https://fromthestress.vn/`) vào DB để test luồng end-to-end — cấu hình 2 link CSV, status tự chuyển `connected`
+- [x] `backend/scripts/force-sync.ts` (mới, đứng ngoài Nest DI để tránh vấn đề tsx/esbuild không emit decorator metadata) — kích hoạt đồng bộ ngay lập tức cho 1 website bằng domain hoặc id, không cần đợi cron 2h sáng. Đã chạy thật: 30 dòng traffic + 32 từ khoá cho `fromthestress.vn`
+- [ ] **Bạn cần làm cho `quatangsg.vn`** (site thật đang có 1610 từ khoá cũ từ Sheet không-tự-refresh): dựng lại 2 spreadsheet mới theo đúng quy trình đã làm với `fromthestress.vn`, đặt lịch Daily cho cả 2, publish CSV, dán đè vào cấu hình website — sau đó **không cần** `force-sync.ts` nữa vì cron 2h sáng sẽ tự chạy (miễn Phase 6 deploy xong, backend chạy 24/7)
+- [ ] Lặp lại quy trình 2-spreadsheet-mỗi-site cho **11 website còn lại**
+- [ ] **Vướng mắc quyền truy cập:** tài khoản Google đang dùng để làm Sheet **không có quyền Search Console** cho 11 site còn lại (chỉ có quyền cho `quatangsg.vn`). Cần chủ sở hữu gốc của từng property vào **Search Console → Cài đặt → Người dùng và quyền → Add user**, cấp quyền **Restricted** là đủ, làm riêng từng property (không có cấp hàng loạt) — hoặc dùng đúng tài khoản Google gốc đã verify các property đó nếu còn đăng nhập được, đỡ phải cấp quyền chéo
 
 ---
 
@@ -123,8 +149,17 @@ Tất cả endpoint dưới đã chạy được, có Swagger tại `/api/docs`:
 
 ---
 
-## Phase 6 — Deploy lên VPS & Non-functional — chưa làm
+## Phase 6 — Deploy lên VPS & Non-functional — 🚧 đang làm, đang kẹt ở bước lấy lại quyền SSH
 
+**Tiến độ (15/09/2026):** đã có subdomain `leadstracking.nghiadang.site` chuẩn bị trỏ vào VPS đã setup từ Phase 1 (IP `103.200.20.41`, hostname `nghiavps-ztky`, 2 vCPU/2GB RAM, đang Running). Định làm theo checklist bên dưới nhưng phát hiện **không còn quyền truy cập VPS**:
+
+- 2 SSH private key hiện có trên máy Mac (`~/.ssh/id_ed25519`, `~/.ssh/id_rsa`) đều bị `deploy@103.200.20.41` từ chối (`Permission denied (publickey,password)`) — key gốc được tạo lúc setup ban đầu qua PuTTY (khả năng trên máy khác), không khớp key trên máy này
+- VPS đã tắt password/root login qua SSH (đúng cấu hình bảo mật đã làm ở Phase 1) nên không login trực tiếp lại được
+- Định dùng tính năng Console/VNC của nhà cung cấp VPS để vào bằng root password, thêm public key máy Mac này (`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDJI5Fw0Zbu1etLKm/lLV3KRKQMssufwcEZzZHARQEqY`) vào `/home/deploy/.ssh/authorized_keys` — nhưng **bạn quên luôn mật khẩu root**
+- [ ] **Đang chờ bạn**: tìm trong dashboard nhà cung cấp VPS tính năng **Reset Root Password** hoặc **Rescue/Recovery Mode** để lấy lại quyền vào máy, sau đó thêm lại public key ở trên cho user `deploy`
+
+**Sau khi lấy lại được quyền SSH, làm tiếp:**
+- [ ] Trỏ DNS `leadstracking.nghiadang.site` → `103.200.20.41` (nếu chưa xong) + cấu hình Nginx server block cho domain này + SSL (Let's Encrypt)
 - [ ] Chạy `prisma migrate deploy` trên VPS (DB `funnel_db` hiện đang trống)
 - [ ] `pm2 start dist/main.js --name funnel-api`, `pm2 save`, `pm2 startup`
 - [ ] Backup `pg_dump` hằng ngày trên VPS (bổ sung cho backup tuần của nhà cung cấp)
@@ -138,5 +173,8 @@ Tất cả endpoint dưới đã chạy được, có Swagger tại `/api/docs`:
 ## Thứ tự đã làm thực tế (khác nhẹ so với dự kiến ban đầu)
 
 1. Phase 1 (hạ tầng VPS) → **Phase 1 (code + DB local)** → **Phase 2 (auth qua Google OAuth, code)** → **Phase 3 (GSC qua GCP API, code)** → **Phase 4 (API)** → phát hiện lo ngại về việc phải add thẻ GCP → **đổi hướng Phase 3 sang Google Sheets CSV** (test thật 100% cho 1 website) → **đổi hướng Phase 2 sang email/password** (test thật 100%, phát hiện & sửa 1 bug lộ password hash) → **Phase 5** (nối frontend, test thật bằng browser đầu-cuối với dữ liệu thật). Dự án hiện không phụ thuộc GCP ở đâu cả, và toàn bộ 8 trang frontend đã chạy với dữ liệu thật (1 website có dữ liệu GSC thật, 11 website còn lại chờ setup Sheet).
-2. **(15/09/2026)** Phát hiện dữ liệu GSC đứng im nhiều ngày dù `sync_logs` báo thành công (add-on Sheet không tự refresh ở bản free + backend chưa deploy 24/7 nên cron cũng không chạy đều) → **đổi hướng Phase 3 lần 2: bỏ Sheet CSV, dùng Apps Script gọi thẳng Search Console API rồi đẩy qua webhook mới** `POST /api/gsc/ingest` (vẫn né GCP project/thẻ tín dụng như quyết định ở Phase 0) → đã code + test đầu-cuối bằng curl xong phần backend, đang chờ bạn cài Apps Script thật (xem `backend/scripts/gsc-apps-script/README.md`).
-3. Tiếp theo nên làm: cài Apps Script cho `quatangsg.vn` theo README trên, xác nhận chạy ổn vài ngày rồi lặp lại cho 11 website còn lại (thay cho việc setup Sheet CSV như dự định trước đây) → **Phase 6** (deploy VPS thật + hoàn thiện, cũng là điều kiện để Apps Script có `backendUrl` public thật thay vì ngrok tạm).
+2. **(15/09/2026)** Phát hiện dữ liệu GSC đứng im nhiều ngày dù `sync_logs` báo thành công (add-on Sheet không tự refresh ở bản free + backend chưa deploy 24/7 nên cron cũng không chạy đều) → thử **đổi hướng Phase 3 lần 2: Apps Script gọi thẳng Search Console API** qua webhook mới `POST /api/gsc/ingest` → code xong, test curl OK, nhưng khi chạy thật với site thật thì **bế tắc thật sự**: project ẩn của Apps Script không bật được API (không có quyền vào Cloud Console), còn tạo project GCP riêng thì bị đòi xác minh thẻ thanh toán ngay bước tạo → **bỏ hẳn hướng Apps Script** (Phase 3.1), không phải lỗi code mà là chính sách tài khoản Google.
+3. Làm tạm **Phase 3.2 (upload CSV thủ công)** làm phương án chữa cháy — nhưng tự nhận ra (đúng, được người dùng chỉ ra) là **không giải quyết yêu cầu gốc "tự động mỗi ngày"**, chỉ là công cụ dự phòng.
+4. Quay lại kiểm tra kỹ add-on Sheet thay vì bỏ cuộc → phát hiện **Phase 3.3: bản Free thực sự có "Scheduled Reports" chạy Daily thật** (xác nhận bằng ảnh chụp), giới hạn 1 lịch/spreadsheet nên dùng **2 spreadsheet riêng mỗi website** (Traffic + Keywords) — đã dựng thật + test thành công với site thử `fromthestress.vn` (30 dòng traffic, 32 từ khoá, đồng bộ ngay bằng script mới `force-sync.ts` thay vì đợi cron). **Đây là hướng chính thức cho GSC**, không đụng GCP.
+5. Bắt đầu **Phase 6 (deploy VPS)**: có subdomain `leadstracking.nghiadang.site` + VPS đã setup từ Phase 1, nhưng **đang kẹt vì mất quyền SSH** (key không khớp, quên mật khẩu root) — đang chờ bạn reset qua dashboard nhà cung cấp VPS.
+6. Việc cần làm tiếp theo, không phụ thuộc thứ tự: (a) lấy lại SSH cho VPS để làm tiếp Phase 6, (b) dựng 2-spreadsheet-mỗi-site theo Phase 3.3 cho `quatangsg.vn` rồi tới 11 site còn lại, (c) xin quyền Search Console (Restricted) cho tài khoản Google đang dùng trên từng property trong 11 site đó.
