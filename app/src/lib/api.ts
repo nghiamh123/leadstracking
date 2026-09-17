@@ -247,6 +247,8 @@ export const syncLogsApi = {
   list: (params: { websiteId?: string; status?: string }) =>
     apiFetch<SyncLogEntry[]>(`/sync-logs${qs(params)}`),
   rerun: (id: string) => apiFetch<unknown>(`/sync-logs/${id}/rerun`, { method: "POST" }),
+  syncNow: (websiteId: string) =>
+    apiFetch<unknown>("/sync-logs/sync", { method: "POST", body: JSON.stringify({ websiteId }) }),
 };
 
 export type { LeadChannel };

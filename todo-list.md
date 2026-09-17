@@ -127,7 +127,7 @@ Tất cả endpoint dưới đã chạy được, có Swagger tại `/api/docs`:
 - [x] **Leads**: full CRUD + soft delete + `GET /leads/:id/history` (audit log) + import CSV + template — đã test tạo/sửa/xoá, xác nhận audit log ghi đúng diff từng field
 - [x] **Orders**: full CRUD tương tự Leads (không có history modal, khớp thiết kế frontend hiện tại)
 - [x] **Users (Admin)**: `GET /users`, `POST /users/invite`, `PATCH /users/:id/role|status`
-- [x] **Sync logs**: `GET /sync-logs`, `POST /sync-logs/:id/rerun`
+- [x] **Sync logs**: `GET /sync-logs`, `POST /sync-logs/:id/rerun`, `POST /sync-logs/sync` (mới — nhận `{websiteId}`, đồng bộ ngay cho 1 website bất kỳ mà **không cần** có sẵn 1 log lỗi để "Chạy lại" như `rerun`, cũng không cần SSH chạy `force-sync.ts` — admin-only, cùng validate qua `class-validator` (`SyncNowDto`))
 - [x] Swagger UI (`@nestjs/swagger`) tại `http://localhost:3000/api/docs`
 
 **Lưu ý cho Phase 5:** API dùng enum tiếng Anh không dấu (`form_web`, `moi`, `dang_cham_soc`, `cho_xu_ly`...) làm giá trị chuẩn trong DB/API — sạch hơn cho DB nhưng **khác** với các chuỗi tiếng Việt frontend đang dùng trực tiếp (`"Mới"`, `"Form web"`...). Cần thêm lớp map label ↔ enum khi nối frontend, xem Phase 5.
@@ -149,24 +149,31 @@ Tất cả endpoint dưới đã chạy được, có Swagger tại `/api/docs`:
 
 ---
 
-## Phase 6 — Deploy lên VPS & Non-functional — 🚧 đang làm, đang kẹt ở bước lấy lại quyền SSH
+## Phase 6 — Deploy lên VPS & Non-functional — ✅ site thật đã chạy production + CI/CD tự động
 
-**Tiến độ (15/09/2026):** đã có subdomain `leadstracking.nghiadang.site` chuẩn bị trỏ vào VPS đã setup từ Phase 1 (IP `103.200.20.41`, hostname `nghiavps-ztky`, 2 vCPU/2GB RAM, đang Running). Định làm theo checklist bên dưới nhưng phát hiện **không còn quyền truy cập VPS**:
+**Đã xong (15/09/2026):** `https://leadstracking.nghiadang.site` chạy thật, SSL hợp lệ (Let's Encrypt), backend qua PM2, frontend qua Nginx static.
 
-- 2 SSH private key hiện có trên máy Mac (`~/.ssh/id_ed25519`, `~/.ssh/id_rsa`) đều bị `deploy@103.200.20.41` từ chối (`Permission denied (publickey,password)`) — key gốc được tạo lúc setup ban đầu qua PuTTY (khả năng trên máy khác), không khớp key trên máy này
-- VPS đã tắt password/root login qua SSH (đúng cấu hình bảo mật đã làm ở Phase 1) nên không login trực tiếp lại được
-- Định dùng tính năng Console/VNC của nhà cung cấp VPS để vào bằng root password, thêm public key máy Mac này (`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDJI5Fw0Zbu1etLKm/lLV3KRKQMssufwcEZzZHARQEqY`) vào `/home/deploy/.ssh/authorized_keys` — nhưng **bạn quên luôn mật khẩu root**
-- [ ] **Đang chờ bạn**: tìm trong dashboard nhà cung cấp VPS tính năng **Reset Root Password** hoặc **Rescue/Recovery Mode** để lấy lại quyền vào máy, sau đó thêm lại public key ở trên cho user `deploy`
+**Sự cố dọc đường (đã giải quyết hết):**
+- Mất quyền SSH vào VPS (key trên máy Mac không khớp key gốc tạo qua PuTTY, VPS đã tắt password/root login nên không vào lại bằng cách thường) → dùng Console/VNC của nhà cung cấp (Vietnix) đăng nhập root sau khi reset lại mật khẩu root, tự thêm public key máy Mac vào `deploy` → SSH lại được bình thường, sau đó khôi phục lại `PermitRootLogin no` / `PasswordAuthentication no` như cấu hình gốc
+- Phát hiện **code trên VPS lúc đó không phải git clone** (chắc do 1 phiên làm việc trước đó tự copy tay qua console lúc SSH bị kẹt) → không quản lý/update được qua `git pull`
 
-**Sau khi lấy lại được quyền SSH, làm tiếp:**
-- [ ] Trỏ DNS `leadstracking.nghiadang.site` → `103.200.20.41` (nếu chưa xong) + cấu hình Nginx server block cho domain này + SSL (Let's Encrypt)
-- [ ] Chạy `prisma migrate deploy` trên VPS (DB `funnel_db` hiện đang trống)
-- [ ] `pm2 start dist/main.js --name funnel-api`, `pm2 save`, `pm2 startup`
+- [x] Lấy lại quyền SSH cho `deploy@103.200.20.41` (public key máy Mac đã thêm vào `~/.ssh/authorized_keys`)
+- [x] `pm2 save` (trước đó tự chạy tay, chưa lưu — VPS reboot sẽ mất process) — đã lưu, `pm2 startup` đã enable từ trước
+- [x] Chuyển toàn bộ deploy sang git-based: clone `github.com/nghiamh123/leadstracking` (public repo) về `/var/www/leadstracking`, build backend + frontend, cutover PM2 + Nginx sang thư mục mới, giữ nguyên `/var/www/funnel` (bản copy tay cũ) làm phao rollback tạm
+- [x] **GitHub Actions CI/CD** (`.github/workflows/deploy.yml`): push lên `main` → typecheck backend + frontend → SSH vào VPS tự `git pull` + build + `prisma migrate deploy` + `pm2 restart` — đã test thật, từ lúc push tới lúc site chạy code mới ~1 phút, không cần thao tác tay. PR vào `main` chỉ chạy typecheck, không deploy.
+- [x] Deploy key riêng cho CI (`ci_deploy_leadstracking`, không dùng chung key cá nhân), lưu ở GitHub Secrets (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`)
+- [x] Test đăng nhập thật trên domain production bằng tài khoản admin seed (`nghia12a319@gmail.com`) — thành công
+- [x] Đồng bộ dữ liệu GSC thật cho `quatangsg.vn` lên production: dán lại 2 link CSV, chạy `force-sync.ts` → 1610 từ khoá đồng bộ đúng
+- [ ] **Traffic GSC trên production hiện chỉ có 1 dòng** (12/09) — CSV nguồn hiện chỉ trả về 1 dòng (Sheet cũ bị thu hẹp report ở đâu đó), 29 ngày lịch sử còn lại (01-11/09) đang có ở DB local **chưa được copy sang production** — hỏi đã đưa ra nhưng chưa được xác nhận làm hay bỏ qua
+- [ ] Cách xem DB production: `ssh deploy@103.200.20.41 "sudo -u postgres psql funnel_db"`, hoặc GUI (TablePlus/Postico) qua "Connect over SSH" tới `deploy@103.200.20.41`, DB host `localhost:5432`
+- [ ] Dọn `backend/package-lock.json`: hiện lệch với `package.json` (npm ci fail, phải dùng `npm install`) — nên chạy `npm install` lại ở local, commit lockfile mới cho khớp, để CI dùng được `npm ci` (nhanh + đúng bản chuẩn hơn `npm install`)
 - [ ] Backup `pg_dump` hằng ngày trên VPS (bổ sung cho backup tuần của nhà cung cấp)
 - [ ] Logging tập trung + alert khi cron GSC fail liên tiếp
 - [ ] Cache `dashboard/summary` nếu cần (chưa cần thiết ở quy mô dữ liệu hiện tại)
 - [ ] Unit test công thức % chuyển đổi & phân loại từ khóa
 - [ ] Viết hướng dẫn sử dụng ngắn gọn cho đội Sales
+- [ ] Xoá `/var/www/funnel` (bản deploy tay cũ) sau khi dùng bản git-based ổn định vài ngày
+- [ ] Nối UI: trang Admin Website chưa có nút gọi `POST /sync-logs/sync` mới thêm — hiện muốn đồng bộ ngay 1 site vẫn phải SSH chạy `force-sync.ts` hoặc đợi cron
 
 ---
 
@@ -176,5 +183,8 @@ Tất cả endpoint dưới đã chạy được, có Swagger tại `/api/docs`:
 2. **(15/09/2026)** Phát hiện dữ liệu GSC đứng im nhiều ngày dù `sync_logs` báo thành công (add-on Sheet không tự refresh ở bản free + backend chưa deploy 24/7 nên cron cũng không chạy đều) → thử **đổi hướng Phase 3 lần 2: Apps Script gọi thẳng Search Console API** qua webhook mới `POST /api/gsc/ingest` → code xong, test curl OK, nhưng khi chạy thật với site thật thì **bế tắc thật sự**: project ẩn của Apps Script không bật được API (không có quyền vào Cloud Console), còn tạo project GCP riêng thì bị đòi xác minh thẻ thanh toán ngay bước tạo → **bỏ hẳn hướng Apps Script** (Phase 3.1), không phải lỗi code mà là chính sách tài khoản Google.
 3. Làm tạm **Phase 3.2 (upload CSV thủ công)** làm phương án chữa cháy — nhưng tự nhận ra (đúng, được người dùng chỉ ra) là **không giải quyết yêu cầu gốc "tự động mỗi ngày"**, chỉ là công cụ dự phòng.
 4. Quay lại kiểm tra kỹ add-on Sheet thay vì bỏ cuộc → phát hiện **Phase 3.3: bản Free thực sự có "Scheduled Reports" chạy Daily thật** (xác nhận bằng ảnh chụp), giới hạn 1 lịch/spreadsheet nên dùng **2 spreadsheet riêng mỗi website** (Traffic + Keywords) — đã dựng thật + test thành công với site thử `fromthestress.vn` (30 dòng traffic, 32 từ khoá, đồng bộ ngay bằng script mới `force-sync.ts` thay vì đợi cron). **Đây là hướng chính thức cho GSC**, không đụng GCP.
-5. Bắt đầu **Phase 6 (deploy VPS)**: có subdomain `leadstracking.nghiadang.site` + VPS đã setup từ Phase 1, nhưng **đang kẹt vì mất quyền SSH** (key không khớp, quên mật khẩu root) — đang chờ bạn reset qua dashboard nhà cung cấp VPS.
-6. Việc cần làm tiếp theo, không phụ thuộc thứ tự: (a) lấy lại SSH cho VPS để làm tiếp Phase 6, (b) dựng 2-spreadsheet-mỗi-site theo Phase 3.3 cho `quatangsg.vn` rồi tới 11 site còn lại, (c) xin quyền Search Console (Restricted) cho tài khoản Google đang dùng trên từng property trong 11 site đó.
+5. Bắt đầu **Phase 6 (deploy VPS)**: có subdomain `leadstracking.nghiadang.site` + VPS đã setup từ Phase 1, kẹt vì mất quyền SSH (key không khớp, quên mật khẩu root) → lấy lại được qua Console/VNC của nhà cung cấp, reset mật khẩu root, thêm lại public key cho `deploy`.
+6. Phát hiện code trên VPS lúc đó là copy tay, không phải git → **chuyển hẳn sang git-based deploy** (clone repo public về `/var/www/leadstracking`, build, cutover PM2 + Nginx sang thư mục mới, giữ bản cũ `/var/www/funnel` làm rollback) → site production chạy thật, SSL hợp lệ, đăng nhập thật thành công.
+7. Setup **GitHub Actions CI/CD**: push `main` → tự typecheck + SSH deploy + `pm2 restart` — đã test thật, chạy đúng trong ~1 phút từ lúc push.
+8. Đồng bộ GSC thật cho `quatangsg.vn` lên production (1610 từ khoá OK, nhưng traffic chỉ có 1 dòng do CSV nguồn hiện bị thu hẹp — 29 ngày lịch sử ở local chưa copy sang, đang chờ quyết định).
+9. Việc cần làm tiếp theo, không phụ thuộc thứ tự: (a) quyết định có copy nốt lịch sử traffic lên production không, (b) dựng 2-spreadsheet-mỗi-site theo Phase 3.3 cho 11 website còn lại, (c) xin quyền Search Console (Restricted) cho tài khoản Google đang dùng trên từng property trong 11 site đó, (d) dọn lockfile backend để `npm ci` chạy được trong CI.

@@ -24,6 +24,7 @@ export function AdminSyncLogs() {
   const [filterWebsite, setFilterWebsite] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [rerunningId, setRerunningId] = useState<string | null>(null);
+  const [syncingNow, setSyncingNow] = useState(false);
 
   function reload() {
     setLoading(true);
@@ -48,6 +49,17 @@ export function AdminSyncLogs() {
       await reload();
     } finally {
       setRerunningId(null);
+    }
+  }
+
+  async function syncNow() {
+    if (filterWebsite === "all") return;
+    setSyncingNow(true);
+    try {
+      await syncLogsApi.syncNow(filterWebsite);
+      await reload();
+    } finally {
+      setSyncingNow(false);
     }
   }
 
@@ -83,6 +95,15 @@ export function AdminSyncLogs() {
           <option value="failed">Thất bại</option>
           <option value="running">Đang chạy</option>
         </Select>
+        <button
+          onClick={syncNow}
+          disabled={filterWebsite === "all" || syncingNow}
+          title={filterWebsite === "all" ? "Chọn 1 website ở bộ lọc để đồng bộ ngay" : undefined}
+          className="ml-auto flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white active:scale-[0.98] disabled:opacity-50"
+        >
+          <ArrowsClockwise size={16} className={syncingNow ? "animate-spin" : ""} />
+          {syncingNow ? "Đang đồng bộ..." : "Đồng bộ ngay"}
+        </button>
       </div>
 
       <div className="fade-up overflow-hidden rounded-xl border border-border bg-surface">

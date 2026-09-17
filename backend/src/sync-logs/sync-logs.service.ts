@@ -23,4 +23,11 @@ export class SyncLogsService {
     if (!log) throw new NotFoundException('Không tìm thấy nhật ký đồng bộ');
     return this.gscSync.syncWebsite(log.websiteId);
   }
+
+  /** Đồng bộ ngay 1 website theo yêu cầu thủ công, không cần đợi cron 02:00 hay có log lỗi sẵn để "Chạy lại". */
+  async syncNow(websiteId: string) {
+    const website = await this.prisma.website.findUnique({ where: { id: websiteId } });
+    if (!website) throw new NotFoundException('Không tìm thấy website');
+    return this.gscSync.syncWebsite(websiteId);
+  }
 }
