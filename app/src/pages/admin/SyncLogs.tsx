@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowsClockwise } from "@phosphor-icons/react";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../../components/ui/Pagination";
 import { useWebsites } from "../../lib/hooks";
 import { syncLogsApi } from "../../lib/api";
 import type { SyncLogEntry } from "../../lib/types";
@@ -20,11 +21,20 @@ const statusLabel: Record<SyncLogEntry["status"], string> = {
 export function AdminSyncLogs() {
   const { websites } = useWebsites();
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
   const [loading, setLoading] = useState(true);
   const [filterWebsite, setFilterWebsite] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [rerunningId, setRerunningId] = useState<string | null>(null);
   const [syncingNow, setSyncingNow] = useState(false);
+
+  // Đổi bộ lọc/số dòng mỗi trang thì quay lại trang 1.
+  useEffect(() => {
+    setPage(1);
+  }, [filterWebsite, filterStatus, pageSize]);
 
   function reload() {
     setLoading(true);
@@ -32,15 +42,21 @@ export function AdminSyncLogs() {
       .list({
         websiteId: filterWebsite === "all" ? undefined : filterWebsite,
         status: filterStatus === "all" ? undefined : filterStatus,
+        page,
+        pageSize,
       })
-      .then(setLogs)
+      .then((res) => {
+        setLogs(res.data);
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterWebsite, filterStatus]);
+  }, [filterWebsite, filterStatus, page, pageSize]);
 
   async function rerun(id: string) {
     setRerunningId(id);
@@ -177,6 +193,18 @@ export function AdminSyncLogs() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="nhật ký"
+          />
+        )}
       </div>
     </div>
   );

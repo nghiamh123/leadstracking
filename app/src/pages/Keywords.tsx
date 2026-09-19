@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { CaretDown, CaretLeft, CaretRight, CaretUp, MagnifyingGlass } from "@phosphor-icons/react";
+import { CaretDown, CaretUp, MagnifyingGlass } from "@phosphor-icons/react";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
 import { useWebsites } from "../lib/hooks";
 import { keywordsApi } from "../lib/api";
 import type { Keyword } from "../lib/types";
 import { formatNumber, formatPercent } from "../lib/format";
 
 type SortKey = "query" | "impressions" | "clicks" | "ctr" | "position";
-
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 const tagLabel: Record<NonNullable<Keyword["tag"]>, { label: string; tone: "yellow" | "green" }> = {
   potential: { label: "Tiềm năng", tone: "yellow" },
@@ -25,7 +24,7 @@ export function Keywords() {
     dir: "desc",
   });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
   const [rows, setRows] = useState<Keyword[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -184,49 +183,16 @@ export function Keywords() {
           </table>
         </div>
 
-        {!loading && total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-3 text-xs text-muted">
-            <div className="flex flex-wrap items-center gap-3">
-              <span>
-                Hiển thị {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {formatNumber(total)} từ khóa
-              </span>
-              <label className="flex items-center gap-1.5">
-                <span>Số dòng/trang</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="rounded-lg border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-ink-soft hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <CaretLeft size={12} />
-                Trước
-              </button>
-              <span className="px-2 tabular-nums">
-                Trang {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-ink-soft hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Sau
-                <CaretRight size={12} />
-              </button>
-            </div>
-          </div>
+        {!loading && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="từ khóa"
+          />
         )}
       </div>
     </div>

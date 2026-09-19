@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Key, Plus } from "@phosphor-icons/react";
 import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../../components/ui/Pagination";
 import { roleLabels } from "../../lib/session";
 import { useUsers } from "../../lib/hooks";
 import { usersApi, ApiError } from "../../lib/api";
@@ -36,6 +37,15 @@ export function AdminUsers() {
   const [newPassword, setNewPassword] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetDone, setResetDone] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
+  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
+  const pagedUsers = users.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   async function updateRole(id: string, role: Role) {
     await usersApi.updateRole(id, role);
@@ -111,7 +121,7 @@ export function AdminUsers() {
             </thead>
             <tbody>
               {!loading &&
-                users.map((u) => (
+                pagedUsers.map((u) => (
                   <tr key={u.id} className="border-b border-border last:border-0">
                     <td className="px-6 py-3 font-medium text-ink-soft">{u.name}</td>
                     <td className="px-6 py-3 text-muted">{u.email}</td>
@@ -172,6 +182,18 @@ export function AdminUsers() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={users.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="người dùng"
+          />
+        )}
       </div>
 
       {showInvite && (

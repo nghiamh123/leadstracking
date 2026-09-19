@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -24,6 +25,8 @@ import type { JwtPayload } from '../common/types/jwt-payload.js';
 import { LeadsService } from './leads.service.js';
 import { CreateLeadDto } from './dto/create-lead.dto.js';
 import { UpdateLeadDto } from './dto/update-lead.dto.js';
+import { ImportSignalUrlDto } from './dto/import-signal-url.dto.js';
+import { fetchSignalCsvText, mapSignalRecords } from './signal-import.util.js';
 
 const TEMPLATE_HEADER = [
   'Ngày',
@@ -50,8 +53,17 @@ export class LeadsController {
     @Query('status') status?: LeadStatus,
     @Query('salesRepId') salesRepId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.leadsService.findAll(user, { websiteId, status, salesRepId, search });
+    return this.leadsService.findAll(user, {
+      websiteId,
+      status,
+      salesRepId,
+      search,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
   }
 
   @Get('template.csv')
@@ -85,6 +97,49 @@ export class LeadsController {
       note: r[8],
     }));
     return this.leadsService.importRows(rows, user);
+  }
+
+  /**
+   * Import từ file "TÍN HIỆU ONLINE" (theo dõi tín hiệu dùng chung nhiều
+   * website của đội sales) - header tiếng Việt, khớp theo tên cột chứ không
+   * theo vị trí, vì cột "Nguồn" quyết định website chứ không phải 1 dropdown.
+   */
+  @Post('import-signal')
+  @Roles(Role.admin, Role.manager)
+  @UseInterceptors(FileInterceptor('file'))
+  async importSignal(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('year') year: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const yearNum = Number(year);
+    if (!Number.isInteger(yearNum) || yearNum < 2000) {
+      throw new BadRequestException('Thiếu hoặc sai tham số "year"');
+    }
+
+    const records: Record<string, string>[] = parse(file.buffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    return this.leadsService.importSignalRows(mapSignalRecords(records), yearNum, user);
+  }
+
+  /** Giống `import-signal` nhưng lấy CSV từ link "Publish to web" thay vì upload file thủ công. */
+  @Post('import-signal-url')
+  @Roles(Role.admin, Role.manager)
+  async importSignalUrl(@Body() dto: ImportSignalUrlDto, @CurrentUser() user: JwtPayload) {
+    const text = await fetchSignalCsvText(dto.url).catch((err: Error) => {
+      throw new BadRequestException(err.message);
+    });
+    const records: Record<string, string>[] = parse(text, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    return this.leadsService.importSignalRows(mapSignalRecords(records), dto.year, user);
   }
 
   @Patch(':id')

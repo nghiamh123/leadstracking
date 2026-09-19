@@ -10,8 +10,9 @@ import {
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { Modal } from "../components/ui/Modal";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
 import { useWebsites, useUsers } from "../lib/hooks";
-import { leadsApi, ApiError } from "../lib/api";
+import { leadsApi, ApiError, type SignalImportResult } from "../lib/api";
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, LEAD_STATUS_LABEL, LEAD_STATUS_OPTIONS } from "../lib/enumMap";
 import type { AuditLogEntry, Lead, LeadChannel, LeadStatus } from "../lib/types";
 import { formatDate } from "../lib/format";
@@ -69,21 +70,46 @@ export function Leads() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [signalModalOpen, setSignalModalOpen] = useState(false);
+  const [signalMode, setSignalMode] = useState<"file" | "url">("file");
+  const [signalFile, setSignalFile] = useState<File | null>(null);
+  const [signalUrl, setSignalUrl] = useState("");
+  const [signalYear, setSignalYear] = useState(new Date().getFullYear());
+  const [signalBusy, setSignalBusy] = useState(false);
+  const [signalError, setSignalError] = useState<string | null>(null);
+  const [signalResult, setSignalResult] = useState<SignalImportResult | null>(null);
+
   const [filterWebsite, setFilterWebsite] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRep, setFilterRep] = useState("all");
   const [search, setSearch] = useState("");
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Đổi bộ lọc/tìm kiếm/số dòng mỗi trang thì quay lại trang 1.
+  useEffect(() => {
+    setPage(1);
+  }, [filterWebsite, filterStatus, filterRep, search, pageSize]);
+
   function reload() {
     setLoading(true);
     return leadsApi
-      .list({
+      .listPaged({
         websiteId: filterWebsite === "all" ? undefined : filterWebsite,
         status: filterStatus === "all" ? undefined : (filterStatus as LeadStatus),
         salesRepId: filterRep === "all" ? undefined : filterRep,
         search: search || undefined,
+        page,
+        pageSize,
       })
-      .then(setLeads)
+      .then((res) => {
+        setLeads(res.data);
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -91,7 +117,7 @@ export function Leads() {
     const timer = setTimeout(reload, 250);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterWebsite, filterStatus, filterRep, search]);
+  }, [filterWebsite, filterStatus, filterRep, search, page, pageSize]);
 
   function validate(f: Omit<Lead, "id">) {
     const errs: Record<string, string> = {};
@@ -162,6 +188,34 @@ export function Leads() {
     reload();
   }
 
+  function openSignalModal() {
+    setSignalMode("file");
+    setSignalFile(null);
+    setSignalUrl("");
+    setSignalError(null);
+    setSignalResult(null);
+    setSignalModalOpen(true);
+  }
+
+  async function submitSignalImport() {
+    if (signalMode === "file" && !signalFile) return;
+    if (signalMode === "url" && !signalUrl.trim()) return;
+    setSignalBusy(true);
+    setSignalError(null);
+    try {
+      const result =
+        signalMode === "file"
+          ? await leadsApi.importSignal(signalFile!, signalYear)
+          : await leadsApi.importSignalUrl(signalUrl.trim(), signalYear);
+      setSignalResult(result);
+      reload();
+    } catch (err) {
+      setSignalError(err instanceof ApiError ? err.message : "Import thất bại, thử lại.");
+    } finally {
+      setSignalBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -215,6 +269,13 @@ export function Leads() {
             >
               <UploadSimple size={16} />
               Nhập Excel/CSV
+            </button>
+            <button
+              onClick={openSignalModal}
+              className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-ink-soft hover:bg-surface-alt"
+            >
+              <UploadSimple size={16} />
+              Nhập file Tín hiệu
             </button>
           </div>
         )}
@@ -375,6 +436,18 @@ export function Leads() {
                 </tbody>
               </table>
             </div>
+
+            {!loading && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="lead"
+              />
+            )}
           </div>
         </>
       ) : (
@@ -568,6 +641,135 @@ export function Leads() {
               <li className="text-muted">Chưa có lịch sử.</li>
             )}
           </ul>
+        </Modal>
+      )}
+
+      {signalModalOpen && (
+        <Modal title="Nhập file Tín hiệu" onClose={() => setSignalModalOpen(false)}>
+          <p className="mb-4 text-xs text-muted">
+            Dùng cho file "TÍN HIỆU ONLINE" của đội sales (cột Nguồn, Kênh, Tình
+            trạng tín hiệu...). Mỗi dòng tạo 1 Lead; dòng có "chốt đơn" sẽ tạo
+            thêm Đơn hàng liên kết. Cột "Ngày" trong file chỉ có ngày/tháng nên
+            cần chọn năm tương ứng.
+          </p>
+
+          {!signalResult ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex rounded-lg border border-border bg-surface-alt p-1">
+                <button
+                  onClick={() => setSignalMode("file")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    signalMode === "file" ? "bg-ink text-white" : "text-ink-soft"
+                  }`}
+                >
+                  Tải file lên
+                </button>
+                <button
+                  onClick={() => setSignalMode("url")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    signalMode === "url" ? "bg-ink text-white" : "text-ink-soft"
+                  }`}
+                >
+                  Dán link Sheet
+                </button>
+              </div>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                  Năm dữ liệu
+                </span>
+                <input
+                  type="number"
+                  value={signalYear}
+                  onChange={(e) => setSignalYear(Number(e.target.value))}
+                  className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                />
+              </label>
+
+              {signalMode === "file" ? (
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                    File CSV
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setSignalFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                </label>
+              ) : (
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                    Link CSV (Publish to web)
+                  </span>
+                  <input
+                    value={signalUrl}
+                    onChange={(e) => setSignalUrl(e.target.value)}
+                    placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+                    className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                  />
+                  <span className="text-xs text-muted">
+                    Trong Google Sheet: File → Chia sẻ → Xuất bản lên web → chọn đúng
+                    tab tháng cần nhập → định dạng CSV.
+                  </span>
+                </label>
+              )}
+
+              {signalError && <p className="text-xs text-pale-red-ink">{signalError}</p>}
+              <button
+                onClick={submitSignalImport}
+                disabled={(signalMode === "file" ? !signalFile : !signalUrl.trim()) || signalBusy}
+                className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {signalBusy ? "Đang nhập..." : "Nhập dữ liệu"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 text-sm">
+              <p>
+                Đã tạo <strong>{signalResult.success}</strong> lead,{" "}
+                <strong>{signalResult.ordersCreated}</strong> đơn hàng.{" "}
+                {signalResult.failed > 0 && (
+                  <span className="text-pale-red-ink">{signalResult.failed} dòng lỗi.</span>
+                )}
+              </p>
+
+              {signalResult.newSalesAccounts.length > 0 && (
+                <div className="rounded-xl border border-pale-yellow bg-pale-yellow/40 p-3 text-xs text-pale-yellow-ink">
+                  <p className="mb-1 font-medium">
+                    Đã tự tạo tài khoản Sales mới — gửi lại mật khẩu tạm cho họ:
+                  </p>
+                  <ul className="flex flex-col gap-1">
+                    {signalResult.newSalesAccounts.map((a) => (
+                      <li key={a.email}>
+                        <strong>{a.name}</strong> — {a.email} — mật khẩu tạm:{" "}
+                        <code className="rounded bg-surface px-1">{a.tempPassword}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {signalResult.errors.length > 0 && (
+                <div className="rounded-xl border border-pale-red bg-pale-red/40 p-3 text-xs text-pale-red-ink">
+                  <p className="mb-1 font-medium">Chi tiết lỗi:</p>
+                  <ul className="list-disc pl-4">
+                    {signalResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <button
+                onClick={() => setSignalModalOpen(false)}
+                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-surface-alt"
+              >
+                Đóng
+              </button>
+            </div>
+          )}
         </Modal>
       )}
     </div>

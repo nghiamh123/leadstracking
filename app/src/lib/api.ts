@@ -160,11 +160,22 @@ export interface WebsiteFunnelRow {
   totalRate: number;
 }
 
+export interface WebsiteTrendPoint {
+  date: string;
+  [websiteId: string]: string | number;
+}
+export interface WebsiteTrendResponse {
+  websites: { id: string; name: string }[];
+  data: WebsiteTrendPoint[];
+}
+
 export const dashboardApi = {
   summary: (params: { start: string; end: string; websiteId?: string; salesRepId?: string }) =>
     apiFetch<DashboardSummary>(`/dashboard/summary${qs(params)}`),
   trend: (params: { start: string; end: string; websiteId?: string; salesRepId?: string }) =>
     apiFetch<TrendPoint[]>(`/dashboard/trend${qs(params)}`),
+  trendByWebsite: (params: { start: string; end: string }) =>
+    apiFetch<WebsiteTrendResponse>(`/dashboard/trend-by-website${qs(params)}`),
   byWebsite: (params: { start: string; end: string; salesRepId?: string }) =>
     apiFetch<WebsiteFunnelRow[]>(`/dashboard/by-website${qs(params)}`),
   exportUrl: (params: { start: string; end: string; salesRepId?: string }) =>
@@ -202,9 +213,29 @@ export const keywordsApi = {
 };
 
 // ---- Leads ----
+export interface LeadsPage {
+  data: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export const leadsApi = {
+  /** Không phân trang - dùng cho dropdown/tra cứu (vd liên kết Lead ở trang Đơn hàng). */
   list: (params: { websiteId?: string; status?: LeadStatus; salesRepId?: string; search?: string }) =>
     apiFetch<Lead[]>(`/leads${qs(params)}`),
+  listPaged: (params: {
+    websiteId?: string;
+    status?: LeadStatus;
+    salesRepId?: string;
+    search?: string;
+    page: number;
+    pageSize: number;
+  }) =>
+    apiFetch<LeadsPage>(
+      `/leads${qs({ ...params, page: String(params.page), pageSize: String(params.pageSize) })}`,
+    ),
   create: (data: Omit<Lead, "id">) =>
     apiFetch<Lead>("/leads", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Omit<Lead, "id">>) =>
@@ -220,12 +251,53 @@ export const leadsApi = {
       body: form,
     });
   },
+  importSignal: async (file: File, year: number) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch<SignalImportResult>(`/leads/import-signal${qs({ year: String(year) })}`, {
+      method: "POST",
+      body: form,
+    });
+  },
+  importSignalUrl: (url: string, year: number) =>
+    apiFetch<SignalImportResult>("/leads/import-signal-url", {
+      method: "POST",
+      body: JSON.stringify({ url, year }),
+    }),
 };
 
+export interface SignalImportResult {
+  success: number;
+  ordersCreated: number;
+  failed: number;
+  errors: string[];
+  newSalesAccounts: { name: string; email: string; tempPassword: string }[];
+}
+
 // ---- Orders ----
+export interface OrdersPage {
+  data: Order[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  /** Tổng giá trị của toàn bộ tập đã lọc (không tính đơn đã huỷ), không chỉ trang hiện tại. */
+  totalValue: number;
+}
+
 export const ordersApi = {
   list: (params: { websiteId?: string; status?: OrderStatus; salesRepId?: string }) =>
     apiFetch<Order[]>(`/orders${qs(params)}`),
+  listPaged: (params: {
+    websiteId?: string;
+    status?: OrderStatus;
+    salesRepId?: string;
+    page: number;
+    pageSize: number;
+  }) =>
+    apiFetch<OrdersPage>(
+      `/orders${qs({ ...params, page: String(params.page), pageSize: String(params.pageSize) })}`,
+    ),
   create: (data: Omit<Order, "id">) =>
     apiFetch<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Omit<Order, "id">>) =>
@@ -243,9 +315,19 @@ export const ordersApi = {
 };
 
 // ---- Sync logs ----
+export interface SyncLogsPage {
+  data: SyncLogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export const syncLogsApi = {
-  list: (params: { websiteId?: string; status?: string }) =>
-    apiFetch<SyncLogEntry[]>(`/sync-logs${qs(params)}`),
+  list: (params: { websiteId?: string; status?: string; page: number; pageSize: number }) =>
+    apiFetch<SyncLogsPage>(
+      `/sync-logs${qs({ ...params, page: String(params.page), pageSize: String(params.pageSize) })}`,
+    ),
   rerun: (id: string) => apiFetch<unknown>(`/sync-logs/${id}/rerun`, { method: "POST" }),
   syncNow: (websiteId: string) =>
     apiFetch<unknown>("/sync-logs/sync", { method: "POST", body: JSON.stringify({ websiteId }) }),

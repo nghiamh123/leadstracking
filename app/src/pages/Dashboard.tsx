@@ -3,6 +3,7 @@ import { DownloadSimple } from "@phosphor-icons/react";
 import { KpiCard } from "../components/ui/KpiCard";
 import { FunnelChart } from "../components/ui/FunnelChart";
 import { TrendChart } from "../components/ui/TrendChart";
+import { WebsiteTrendChart } from "../components/ui/WebsiteTrendChart";
 import { Select } from "../components/ui/Select";
 import { useWebsites, useUsers } from "../lib/hooks";
 import {
@@ -10,6 +11,7 @@ import {
   type DashboardSummary,
   type TrendPoint,
   type WebsiteFunnelRow,
+  type WebsiteTrendResponse,
 } from "../lib/api";
 import {
   previousRange,
@@ -42,6 +44,10 @@ export function Dashboard() {
   const [current, setCurrent] = useState<DashboardSummary>(emptySummary);
   const [previous, setPrevious] = useState<DashboardSummary>(emptySummary);
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
+  const [trendByWebsite, setTrendByWebsite] = useState<WebsiteTrendResponse>({
+    websites: [],
+    data: [],
+  });
   const [websiteRows, setWebsiteRows] = useState<WebsiteFunnelRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,12 +67,14 @@ export function Dashboard() {
       dashboardApi.summary(filters),
       dashboardApi.summary({ ...filters, start: prevRange.start, end: prevRange.end }),
       dashboardApi.trend(filters),
+      dashboardApi.trendByWebsite({ start, end }),
       dashboardApi.byWebsite({ start, end, salesRepId: filters.salesRepId }),
     ])
-      .then(([curr, prev, trend, byWebsite]) => {
+      .then(([curr, prev, trend, trendByWebsiteRes, byWebsite]) => {
         setCurrent(curr);
         setPrevious(prev);
         setTrendData(trend);
+        setTrendByWebsite(trendByWebsiteRes);
         setWebsiteRows(byWebsite);
       })
       .finally(() => setLoading(false));
@@ -161,27 +169,35 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="fade-up rounded-xl border border-border bg-surface p-6 lg:col-span-2">
-          <h2 className="mb-6 font-serif text-lg text-ink">
-            Phễu chuyển đổi
-          </h2>
-          <FunnelChart
-            stages={[
-              { label: "Traffic", value: current.clicks, tone: "ink" },
-              { label: "Lead", value: current.leadCount, tone: "blue" },
-              { label: "Đơn hàng", value: current.orderCount, tone: "green" },
-            ]}
-          />
-        </div>
+      <div className="fade-up rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-6 font-serif text-lg text-ink">Phễu chuyển đổi</h2>
+        <FunnelChart
+          stages={[
+            { label: "Traffic", value: current.clicks, tone: "ink" },
+            { label: "Lead", value: current.leadCount, tone: "blue" },
+            { label: "Đơn hàng", value: current.orderCount, tone: "green" },
+          ]}
+        />
+      </div>
 
-        <div className="fade-up rounded-xl border border-border bg-surface p-6 lg:col-span-3">
-          <h2 className="mb-2 font-serif text-lg text-ink">Xu hướng theo ngày</h2>
-          <p className="mb-2 text-xs text-muted">
-            Trục trái: Traffic (click) · Trục phải: số lượng Lead / Đơn hàng
-          </p>
-          <TrendChart data={trendData} />
-        </div>
+      <div className="fade-up rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-2 font-serif text-lg text-ink">Xu hướng theo ngày</h2>
+        {websiteId === "all" ? (
+          <>
+            <p className="mb-4 text-xs text-muted">
+              Traffic (click) theo từng website — bấm vào tên để ẩn/hiện đường tương ứng.
+            </p>
+            <WebsiteTrendChart websites={trendByWebsite.websites} data={trendByWebsite.data} />
+          </>
+        ) : (
+          <>
+            <p className="mb-2 text-xs text-muted">
+              Đang xem: {websites.find((w) => w.id === websiteId)?.name ?? ""} · Trục trái:
+              Traffic (click) · Trục phải: số lượng Lead / Đơn hàng
+            </p>
+            <TrendChart data={trendData} />
+          </>
+        )}
       </div>
 
       <div className="fade-up overflow-hidden rounded-xl border border-border bg-surface">

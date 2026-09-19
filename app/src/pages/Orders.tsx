@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
 import { useWebsites, useUsers } from "../lib/hooks";
 import { leadsApi, ordersApi, ApiError } from "../lib/api";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_OPTIONS } from "../lib/enumMap";
@@ -56,30 +57,44 @@ export function Orders() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRep, setFilterRep] = useState("all");
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalValue, setTotalValue] = useState(0);
+
   useEffect(() => {
     leadsApi.list({}).then(setAllLeads);
   }, []);
 
+  // Đổi bộ lọc/số dòng mỗi trang thì quay lại trang 1.
+  useEffect(() => {
+    setPage(1);
+  }, [filterWebsite, filterStatus, filterRep, pageSize]);
+
   function reload() {
     setLoading(true);
     return ordersApi
-      .list({
+      .listPaged({
         websiteId: filterWebsite === "all" ? undefined : filterWebsite,
         status: filterStatus === "all" ? undefined : (filterStatus as OrderStatus),
         salesRepId: filterRep === "all" ? undefined : filterRep,
+        page,
+        pageSize,
       })
-      .then(setOrders)
+      .then((res) => {
+        setOrders(res.data);
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+        setTotalValue(res.totalValue);
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterWebsite, filterStatus, filterRep]);
-
-  const totalValue = orders
-    .filter((o) => o.status !== "huy")
-    .reduce((s, o) => s + o.value, 0);
+  }, [filterWebsite, filterStatus, filterRep, page, pageSize]);
 
   function validate(f: Omit<Order, "id">) {
     const errs: Record<string, string> = {};
@@ -343,6 +358,18 @@ export function Orders() {
                 </tbody>
               </table>
             </div>
+
+            {!loading && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="đơn hàng"
+              />
+            )}
           </div>
         </>
       ) : (

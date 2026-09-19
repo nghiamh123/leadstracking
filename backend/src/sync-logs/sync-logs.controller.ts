@@ -14,8 +14,18 @@ export class SyncLogsController {
   constructor(private syncLogsService: SyncLogsService) {}
 
   @Get()
-  findAll(@Query('websiteId') websiteId?: string, @Query('status') status?: SyncStatus) {
-    return this.syncLogsService.findAll(websiteId, status);
+  findAll(
+    @Query('websiteId') websiteId?: string,
+    @Query('status') status?: SyncStatus,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.syncLogsService.findAll(
+      websiteId,
+      status,
+      page ? Number(page) : undefined,
+      pageSize ? Number(pageSize) : undefined,
+    );
   }
 
   @Post(':id/rerun')

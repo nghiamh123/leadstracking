@@ -80,6 +80,27 @@ export class DashboardService {
     }));
   }
 
+  /** Traffic theo ngày, tách riêng từng website (dùng cho chart nhiều đường khi xem "Tất cả website"). */
+  async trendByWebsite(query: { start: string; end: string }) {
+    const dates = listDates(query.start, query.end);
+    const websites = await this.prisma.website.findMany({ orderBy: { name: 'asc' } });
+    const traffic = await this.prisma.gscDailyTraffic.findMany({
+      where: { date: { gte: new Date(query.start), lte: new Date(query.end) } },
+    });
+
+    const data = dates.map((date) => {
+      const row: Record<string, string | number> = { date };
+      for (const site of websites) {
+        row[site.id] = traffic
+          .filter((t) => t.websiteId === site.id && t.date.toISOString().slice(0, 10) === date)
+          .reduce((sum, t) => sum + t.clicks, 0);
+      }
+      return row;
+    });
+
+    return { websites: websites.map((w) => ({ id: w.id, name: w.name })), data };
+  }
+
   async byWebsite(user: JwtPayload, query: Omit<DashboardQuery, 'websiteId'>) {
     const websites = await this.prisma.website.findMany();
 

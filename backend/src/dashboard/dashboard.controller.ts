@@ -32,6 +32,11 @@ export class DashboardController {
     return this.dashboardService.trend(user, { start, end, websiteId, salesRepId });
   }
 
+  @Get('trend-by-website')
+  trendByWebsite(@Query('start') start: string, @Query('end') end: string) {
+    return this.dashboardService.trendByWebsite({ start, end });
+  }
+
   @Get('by-website')
   byWebsite(
     @CurrentUser() user: JwtPayload,

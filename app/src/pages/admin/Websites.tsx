@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowsClockwise, PencilSimple, Plus, UploadSimple } from "@phosphor-icons/react";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../../components/ui/Pagination";
 import { useWebsites } from "../../lib/hooks";
 import { websitesApi, ApiError } from "../../lib/api";
 import type { Website } from "../../lib/types";
@@ -58,6 +59,15 @@ export function AdminWebsites() {
     keywords?: { ok: boolean; rows: number };
   } | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
+  const totalPages = Math.max(1, Math.ceil(websites.length / pageSize));
+  const pagedWebsites = websites.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   async function reconnect(id: string) {
     await websitesApi.reconnect(id);
@@ -244,7 +254,7 @@ export function AdminWebsites() {
             </thead>
             <tbody>
               {!loading &&
-                websites.map((w) => (
+                pagedWebsites.map((w) => (
                   <tr key={w.id} className="border-b border-border last:border-0">
                     <td className="px-6 py-3 font-medium text-ink-soft">{w.name}</td>
                     <td className="px-6 py-3 text-muted">{w.domain}</td>
@@ -290,6 +300,18 @@ export function AdminWebsites() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={websites.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="website"
+          />
+        )}
       </div>
 
       {showAdd && (

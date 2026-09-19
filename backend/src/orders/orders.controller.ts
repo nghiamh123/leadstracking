@@ -39,8 +39,16 @@ export class OrdersController {
     @Query('websiteId') websiteId?: string,
     @Query('status') status?: OrderStatus,
     @Query('salesRepId') salesRepId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.ordersService.findAll(user, { websiteId, status, salesRepId });
+    return this.ordersService.findAll(user, {
+      websiteId,
+      status,
+      salesRepId,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
   }
 
   @Get('template.csv')
