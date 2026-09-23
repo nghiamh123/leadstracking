@@ -64,6 +64,14 @@ enum AuditAction {
   delete
 }
 
+/// `tool` = kết quả tool gửi lại cho model (gửi lên API với role "user"),
+/// tách riêng để đếm/cắt lịch sử theo tin nhắn thật của người dùng.
+enum AssistantMessageRole {
+  user
+  assistant
+  tool
+}
+
 model User {
   id           String     @id @default(cuid())
   name         String
@@ -80,6 +88,7 @@ model User {
   salesOrders   Order[]    @relation("OrderSalesRep")
   createdOrders Order[]    @relation("OrderCreatedBy")
   auditLogs     AuditLog[]
+  assistantConversations AssistantConversation[]
 
   @@map("users")
 }
@@ -224,4 +233,39 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+model AssistantConversation {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  persona   String // "seo" - sau này thêm "sales", "admin"
+  title     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  // Cập nhật mỗi khi có tin nhắn mới - cron xoá hội thoại không hoạt động quá 90 ngày dựa vào cột này.
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AssistantMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([updatedAt])
+  @@map("assistant_conversations")
+}
+
+model AssistantMessage {
+  id              String               @id @default(cuid())
+  conversationId  String               @map("conversation_id")
+  role            AssistantMessageRole
+  // Nguyên content blocks của Claude API (text, thinking, tool_use, tool_result...) -
+  // phải gửi lại đúng như cũ ở lượt sau, không chỉ phần text.
+  content         Json
+  inputTokens     Int?                 @map("input_tokens")
+  outputTokens    Int?                 @map("output_tokens")
+  cacheReadTokens Int?                 @map("cache_read_tokens")
+  createdAt       DateTime             @default(now()) @map("created_at")
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("assistant_messages")
 }

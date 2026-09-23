@@ -11,6 +11,7 @@ import { KeywordsModule } from './keywords/keywords.module.js';
 import { LeadsModule } from './leads/leads.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
+import { AssistantModule } from './assistant/assistant.module.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
     LeadsModule,
     OrdersModule,
     DashboardModule,
+    AssistantModule,
   ],
 })
 export class AppModule {}
