@@ -1,36 +1,14 @@
 import { z } from 'zod';
 import { defineTool, type AssistantTool } from '../personas/persona.js';
-import { MAX_LIMIT, type SeoInsightsService } from './seo-insights.service.js';
+import type { SeoInsightsService } from './seo-insights.service.js';
+import { checkRange, limit, rangeShape, round1 } from '../personas/tool-helpers.js';
 import type { DashboardService } from '../../dashboard/dashboard.service.js';
 import type { JwtPayload } from '../../common/types/jwt-payload.js';
-
-const MAX_RANGE_DAYS = 180;
-
-const dateStr = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Định dạng YYYY-MM-DD')
-  .refine((s) => !Number.isNaN(new Date(s).getTime()), 'Ngày không hợp lệ');
-
-const rangeShape = { start: dateStr, end: dateStr };
-
-/** Dùng superRefine trên chính z.object (không .and) để JSON Schema gửi lên API vẫn là `type: object`. */
-function checkRange(r: { start: string; end: string }, ctx: z.RefinementCtx) {
-  if (r.start > r.end) ctx.addIssue({ code: 'custom', message: 'start phải <= end' });
-  if ((new Date(r.end).getTime() - new Date(r.start).getTime()) / 86_400_000 >= MAX_RANGE_DAYS) {
-    ctx.addIssue({ code: 'custom', message: `Khoảng ngày tối đa ${MAX_RANGE_DAYS} ngày` });
-  }
-}
 
 const websiteId = z
   .string()
   .optional()
   .describe('ID website lấy từ list_websites. Bỏ trống = tất cả website.');
-
-const limit = z.number().int().min(1).max(MAX_LIMIT).optional().describe(`Số dòng tối đa (mặc định 20, tối đa ${MAX_LIMIT}).`);
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
-}
 
 export function buildSeoTools(
   deps: { insights: SeoInsightsService; dashboard: DashboardService },
@@ -105,26 +83,31 @@ export function buildSeoTools(
       run: (input) => deps.insights.crossSiteOverlap(input),
     }),
 
-    defineTool({
-      name: 'get_website_funnel',
-      description:
-        'Phễu chuyển đổi theo từng website trong [start, end]: click (traffic) → lead → đơn hàng và các tỉ lệ chuyển đổi (%). ' +
-        'Dùng để tìm website nhiều traffic nhưng ít lead, hoặc so sánh hiệu quả giữa các site.',
-      statusLabel: 'Đang xem phễu chuyển đổi…',
-      inputSchema: z.object(rangeShape).superRefine(checkRange),
-      run: async (input) => {
-        const rows = await deps.dashboard.byWebsite(user, input);
-        return rows.map((r) => ({
-          websiteId: r.websiteId,
-          website: r.websiteName,
-          clicks: r.clicks,
-          leads: r.leadCount,
-          orders: r.orderCount,
-          clickToLeadPercent: round1(r.leadRate),
-          leadToOrderPercent: round1(r.orderRate),
-          clickToOrderPercent: round1(r.totalRate),
-        }));
-      },
-    }),
+    websiteFunnelTool(deps.dashboard, user),
   ];
+}
+
+/** Traffic → lead → đơn theo website; dùng chung cho persona SEO và Vận hành. */
+export function websiteFunnelTool(dashboard: DashboardService, user: JwtPayload): AssistantTool {
+  return defineTool({
+    name: 'get_website_funnel',
+    description:
+      'Phễu chuyển đổi theo từng website trong [start, end]: click (traffic) → lead → đơn hàng và các tỉ lệ chuyển đổi (%). ' +
+      'Dùng để tìm website nhiều traffic nhưng ít lead, hoặc so sánh hiệu quả giữa các site.',
+    statusLabel: 'Đang xem phễu chuyển đổi…',
+    inputSchema: z.object(rangeShape).superRefine(checkRange),
+    run: async (input) => {
+      const rows = await dashboard.byWebsite(user, input);
+      return rows.map((r) => ({
+        websiteId: r.websiteId,
+        website: r.websiteName,
+        clicks: r.clicks,
+        leads: r.leadCount,
+        orders: r.orderCount,
+        clickToLeadPercent: round1(r.leadRate),
+        leadToOrderPercent: round1(r.orderRate),
+        clickToOrderPercent: round1(r.totalRate),
+      }));
+    },
+  });
 }

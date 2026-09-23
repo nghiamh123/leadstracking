@@ -336,10 +336,17 @@ export const syncLogsApi = {
 };
 
 // ---- Trợ lý AI ----
+export type AssistantPersonaKey = "ops" | "seo" | "sales";
+
+export interface AssistantPersona {
+  key: AssistantPersonaKey;
+  label: string;
+  description: string;
+}
+
 export interface AssistantStatus {
-  available: boolean;
-  persona: string | null;
-  message: string | null;
+  /** Trợ lý mà role hiện tại được dùng; phần tử đầu là mặc định. */
+  personas: AssistantPersona[];
   dailyLimit: number;
   usedToday: number;
   retentionDays: number;
@@ -348,7 +355,7 @@ export interface AssistantStatus {
 export interface AssistantConversation {
   id: string;
   title: string | null;
-  persona: string;
+  persona: AssistantPersonaKey;
   createdAt: string;
   updatedAt: string;
 }
@@ -369,8 +376,11 @@ export interface AssistantReply {
 export const assistantApi = {
   status: () => apiFetch<AssistantStatus>("/assistant/status"),
   conversations: () => apiFetch<AssistantConversation[]>("/assistant/conversations"),
-  createConversation: () =>
-    apiFetch<AssistantConversation>("/assistant/conversations", { method: "POST" }),
+  createConversation: (persona: AssistantPersonaKey) =>
+    apiFetch<AssistantConversation>("/assistant/conversations", {
+      method: "POST",
+      body: JSON.stringify({ persona }),
+    }),
   messages: (id: string) => apiFetch<AssistantMessage[]>(`/assistant/conversations/${id}/messages`),
   remove: (id: string) =>
     apiFetch<{ ok: true }>(`/assistant/conversations/${id}`, { method: "DELETE" }),

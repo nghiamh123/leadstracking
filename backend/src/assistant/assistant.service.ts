@@ -17,9 +17,18 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DashboardService } from '../dashboard/dashboard.service.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
-import { PERSONA_BY_ROLE, type AssistantTool, type Persona } from './personas/persona.js';
+import {
+  PERSONA_INFO,
+  PERSONAS_BY_ROLE,
+  type AssistantTool,
+  type Persona,
+  type PersonaKey,
+} from './personas/persona.js';
 import { SeoInsightsService } from './seo/seo-insights.service.js';
 import { buildSeoPersona } from './seo/seo.persona.js';
+import { LeadInsightsService } from './leads/lead-insights.service.js';
+import { buildOpsPersona } from './ops/ops.persona.js';
+import { buildSalesPersona } from './sales/sales.persona.js';
 import { startOfTodayVn, textOf, toApiMessages, toDisplayMessages, trimHistory } from './history.js';
 
 type BetaMessage = Anthropic.Beta.BetaMessage;
@@ -48,9 +57,9 @@ export interface ChatResult {
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
 }
 
-const NO_PERSONA_MESSAGE = 'Trợ lý AI cho vai trò của bạn đang được phát triển.';
+const NO_PERSONA_MESSAGE = 'Bạn không có quyền dùng trợ lý này.';
 const REFUSAL_TEXT =
-  'Xin lỗi, mình không thể trả lời câu hỏi này. Bạn thử diễn đạt lại hoặc hỏi về SEO/traffic của các website nhé.';
+  'Xin lỗi, mình không thể trả lời câu hỏi này. Bạn thử diễn đạt lại hoặc hỏi trong phạm vi công việc của trợ lý nhé.';
 
 @Injectable()
 export class AssistantService {
@@ -64,12 +73,20 @@ export class AssistantService {
     private config: ConfigService,
     private insights: SeoInsightsService,
     private dashboard: DashboardService,
+    private leads: LeadInsightsService,
   ) {}
 
-  personaFor(user: JwtPayload): Persona | null {
-    const key = PERSONA_BY_ROLE[user.role];
-    if (key === 'seo') return buildSeoPersona({ insights: this.insights, dashboard: this.dashboard }, user);
-    return null;
+  /** Dựng persona cho user; null nếu role của user không được dùng persona này. */
+  personaFor(user: JwtPayload, key: PersonaKey): Persona | null {
+    if (!PERSONAS_BY_ROLE[user.role].includes(key)) return null;
+    switch (key) {
+      case 'seo':
+        return buildSeoPersona({ insights: this.insights, dashboard: this.dashboard }, user);
+      case 'ops':
+        return buildOpsPersona({ leads: this.leads, dashboard: this.dashboard }, user);
+      case 'sales':
+        return buildSalesPersona({ leads: this.leads }, user);
+    }
   }
 
   private dailyLimit(): number {
@@ -87,11 +104,8 @@ export class AssistantService {
   }
 
   async status(user: JwtPayload) {
-    const persona = this.personaFor(user);
     return {
-      available: persona !== null,
-      persona: persona?.key ?? null,
-      message: persona ? null : NO_PERSONA_MESSAGE,
+      personas: PERSONAS_BY_ROLE[user.role].map((key) => ({ key, ...PERSONA_INFO[key] })),
       dailyLimit: this.dailyLimit(),
       usedToday: await this.countToday(user.sub),
       retentionDays: RETENTION_DAYS,
@@ -106,11 +120,11 @@ export class AssistantService {
     });
   }
 
-  async createConversation(user: JwtPayload) {
-    const persona = this.personaFor(user);
-    if (!persona) throw new ForbiddenException(NO_PERSONA_MESSAGE);
+  async createConversation(user: JwtPayload, personaKey?: PersonaKey) {
+    const key = personaKey ?? PERSONAS_BY_ROLE[user.role][0];
+    if (!PERSONAS_BY_ROLE[user.role].includes(key)) throw new ForbiddenException(NO_PERSONA_MESSAGE);
     return this.prisma.assistantConversation.create({
-      data: { userId: user.sub, persona: persona.key },
+      data: { userId: user.sub, persona: key },
       select: { id: true, title: true, persona: true, createdAt: true, updatedAt: true },
     });
   }
@@ -146,11 +160,9 @@ export class AssistantService {
     onEvent: (e: ChatEvent) => void = () => {},
   ): Promise<ChatResult> {
     const conversation = await this.findOwned(user, conversationId);
-    const persona = this.personaFor(user);
-    // Role có thể đã bị đổi sau khi tạo hội thoại - không cho tiếp tục bằng persona cũ.
-    if (!persona || persona.key !== conversation.persona) {
-      throw new ForbiddenException(persona ? 'Hội thoại này thuộc trợ lý khác' : NO_PERSONA_MESSAGE);
-    }
+    // Role có thể đã bị đổi sau khi tạo hội thoại - kiểm tra lại quyền dùng persona mỗi lần gửi.
+    const persona = this.personaFor(user, conversation.persona as PersonaKey);
+    if (!persona) throw new ForbiddenException(NO_PERSONA_MESSAGE);
     if ((await this.countToday(user.sub)) >= this.dailyLimit()) {
       throw new HttpException(
         `Bạn đã dùng hết ${this.dailyLimit()} tin nhắn hôm nay, quay lại vào ngày mai nhé.`,

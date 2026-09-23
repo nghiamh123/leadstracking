@@ -16,16 +16,44 @@ import {
   assistantApi,
   type AssistantConversation,
   type AssistantMessage,
+  type AssistantPersona,
+  type AssistantPersonaKey,
   type AssistantStatus,
 } from "../lib/api";
 import { formatDateShort } from "../lib/format";
 
-const SUGGESTIONS = [
-  "Từ khoá nào sắp lọt top 3 và đáng đầu tư nhất?",
-  "Website nào traffic giảm so với 4 tuần trước?",
-  "Keyword nào CTR thấp, cần sửa title/meta?",
-  "Website nào nhiều traffic nhưng ít lead?",
-];
+const PERSONA_UI: Record<AssistantPersonaKey, { intro: string; suggestions: string[] }> = {
+  ops: {
+    intro:
+      "Hỏi về phễu bán hàng, hiệu quả từng kênh và đội sales. Trợ lý đọc số liệu lead, đơn hàng và traffic thật trong phạm vi bạn được xem.",
+    suggestions: [
+      "Tuần này đội sales nên ưu tiên xử lý việc gì?",
+      "Ai đang có nhiều lead bị bỏ quên nhất?",
+      "Kênh nào ra nhiều đơn nhất 3 tháng qua?",
+      "So sánh tỉ lệ chốt đơn giữa các nhân viên sales",
+    ],
+  },
+  seo: {
+    intro:
+      "Hỏi về traffic, từ khoá và hiệu quả chuyển đổi của các website. Trợ lý đọc số liệu thật từ Google Search Console và hệ thống lead.",
+    suggestions: [
+      "Từ khoá nào sắp lọt top 3 và đáng đầu tư nhất?",
+      "Website nào traffic giảm so với 4 tuần trước?",
+      "Keyword nào CTR thấp, cần sửa title/meta?",
+      "Website nào nhiều traffic nhưng ít lead?",
+    ],
+  },
+  sales: {
+    intro:
+      "Hỏi nên liên hệ khách nào trước, nhờ soạn tin nhắn chăm sóc khách. Trợ lý chỉ xem lead của chính bạn, không xem số điện thoại.",
+    suggestions: [
+      "Hôm nay nên liên hệ lại khách nào trước?",
+      "Khách nào đã nhận báo giá mà chưa chốt?",
+      "Soạn tin nhắn Zalo hỏi thăm khách đã nhận báo giá",
+      "Kết quả bán hàng của tôi tháng này thế nào?",
+    ],
+  },
+};
 
 const TOOL_LABELS: Record<string, string> = {
   list_websites: "Danh sách website",
@@ -33,7 +61,14 @@ const TOOL_LABELS: Record<string, string> = {
   find_keyword_opportunities: "Cơ hội từ khoá",
   search_keywords: "Tìm từ khoá",
   find_cross_site_overlap: "Từ khoá trùng giữa các site",
-  get_website_funnel: "Phễu chuyển đổi",
+  get_website_funnel: "Phễu chuyển đổi website",
+  get_lead_funnel: "Phễu lead",
+  get_team_workload: "Khối lượng việc đội sales",
+  find_stale_leads: "Lead bị bỏ quên",
+  list_my_open_leads: "Khách đang chăm sóc",
+  search_my_leads: "Tìm khách",
+  get_lead_detail: "Chi tiết khách",
+  get_my_performance: "Kết quả bán hàng",
 };
 
 /** Câu trả lời đang stream: phần chữ đã nhận + tool đang chạy (nếu có). */
@@ -52,6 +87,7 @@ function formatUpdated(iso: string): string {
 
 function ConversationList({
   conversations,
+  personas,
   activeId,
   disabled,
   retentionDays,
@@ -60,6 +96,7 @@ function ConversationList({
   onDelete,
 }: {
   conversations: AssistantConversation[];
+  personas: AssistantPersona[];
   activeId: string | null;
   disabled: boolean;
   retentionDays: number;
@@ -97,8 +134,13 @@ function ConversationList({
               className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left disabled:cursor-not-allowed"
             >
               <ChatCircleText size={14} className="shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 truncate text-sm text-ink-soft">
-                {c.title ?? "Hội thoại mới"}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-ink-soft">{c.title ?? "Hội thoại mới"}</span>
+                {personas.length > 1 && (
+                  <span className="block text-[11px] text-muted">
+                    {personas.find((p) => p.key === c.persona)?.label ?? c.persona}
+                  </span>
+                )}
               </span>
               <span className="shrink-0 text-[11px] text-muted">{formatUpdated(c.updatedAt)}</span>
             </button>
@@ -183,6 +225,8 @@ export function Assistant() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Trợ lý cho hội thoại mới (chỉ có ý nghĩa khi role dùng được nhiều trợ lý).
+  const [newPersona, setNewPersona] = useState<AssistantPersonaKey | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Hội thoại vừa được tạo trong lúc gửi tin đầu tiên - không tải lại (sẽ xoá mất tin đang hiển thị).
@@ -260,7 +304,7 @@ export function Assistant() {
 
   async function send(raw: string) {
     const text = raw.trim();
-    if (!text || pending) return;
+    if (!text || pending || !currentPersona) return;
     setError(null);
     setInput("");
     setMessages((m) => [...m, { role: "user", text, toolsUsed: [], createdAt: new Date().toISOString() }]);
@@ -269,7 +313,7 @@ export function Assistant() {
     try {
       let id = activeId;
       if (!id) {
-        id = (await assistantApi.createConversation()).id;
+        id = (await assistantApi.createConversation(currentPersona!.key)).id;
         justCreatedRef.current = id;
         setSearchParams({ c: id }, { replace: true });
       }
@@ -315,23 +359,19 @@ export function Assistant() {
     }
   }
 
-  if (status && !status.available) {
-    return (
-      <div className="mx-auto max-w-xl">
-        <div className="fade-up flex flex-col items-center gap-3 rounded-xl border border-border bg-surface px-6 py-12 text-center">
-          <AssistantAvatar />
-          <h2 className="font-serif text-xl text-ink">Trợ lý AI</h2>
-          <p className="text-sm text-muted">{status.message}</p>
-        </div>
-      </div>
-    );
-  }
+  const personas = status?.personas ?? [];
+  const activeConversation = conversations.find((c) => c.id === activeId);
+  // Hội thoại đang mở → trợ lý của nó; hội thoại mới → trợ lý đang chọn (mặc định là trợ lý đầu tiên).
+  const currentPersona =
+    personas.find((p) => p.key === (activeConversation?.persona ?? newPersona)) ?? personas[0];
+  const ui = currentPersona ? PERSONA_UI[currentPersona.key] : null;
 
   const busy = pending !== null;
   const limitReached = status ? status.usedToday >= status.dailyLimit : false;
-  const activeTitle = conversations.find((c) => c.id === activeId)?.title;
+  const activeTitle = activeConversation?.title;
   const listProps = {
     conversations,
+    personas,
     activeId,
     disabled: busy,
     retentionDays: status?.retentionDays ?? 90,
@@ -356,7 +396,7 @@ export function Assistant() {
             <ClockCounterClockwise size={18} />
           </button>
           <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
-            {activeTitle ?? "Trợ lý SEO"}
+            {activeTitle ?? currentPersona?.label ?? "Trợ lý AI"}
           </p>
           {status && (
             <span className="shrink-0 text-[11px] text-muted">
@@ -369,16 +409,29 @@ export function Assistant() {
           <div className="mx-auto flex max-w-3xl flex-col gap-6">
             {loadingMessages && <p className="text-center text-sm text-muted">Đang tải...</p>}
 
-            {!loadingMessages && messages.length === 0 && !busy && (
+            {!loadingMessages && messages.length === 0 && !busy && currentPersona && ui && (
               <div className="fade-up flex flex-col items-center gap-3 pt-6 text-center sm:pt-12">
                 <AssistantAvatar />
-                <h2 className="font-serif text-2xl text-ink">Trợ lý SEO</h2>
-                <p className="max-w-md text-sm text-muted">
-                  Hỏi về traffic, từ khoá và hiệu quả chuyển đổi của các website. Trợ lý đọc số liệu
-                  thật từ Google Search Console và hệ thống lead.
-                </p>
+                {/* Chọn trợ lý chỉ khi đang ở hội thoại mới và role dùng được nhiều trợ lý. */}
+                {!activeId && personas.length > 1 && (
+                  <div className="flex rounded-lg border border-border bg-surface-alt p-0.5 text-sm">
+                    {personas.map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => setNewPersona(p.key)}
+                        className={`rounded-md px-3 py-1.5 transition-colors ${
+                          p.key === currentPersona.key ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink-soft"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <h2 className="font-serif text-2xl text-ink">{currentPersona.label}</h2>
+                <p className="max-w-md text-sm text-muted">{ui.intro}</p>
                 <div className="mt-4 grid w-full gap-2 sm:grid-cols-2">
-                  {SUGGESTIONS.map((s) => (
+                  {ui.suggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => send(s)}
@@ -414,13 +467,15 @@ export function Assistant() {
                 maxLength={4000}
                 disabled={limitReached}
                 placeholder={
-                  limitReached ? "Bạn đã dùng hết lượt hôm nay, quay lại vào ngày mai nhé." : "Hỏi trợ lý SEO…"
+                  limitReached
+                    ? "Bạn đã dùng hết lượt hôm nay, quay lại vào ngày mai nhé."
+                    : `Hỏi ${currentPersona?.label.toLowerCase() ?? "trợ lý"}…`
                 }
                 className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-sm text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed"
               />
               <button
                 onClick={() => send(input)}
-                disabled={busy || limitReached || !input.trim()}
+                disabled={busy || limitReached || !input.trim() || !currentPersona}
                 className="rounded-lg bg-ink p-2 text-white transition-opacity hover:opacity-90 disabled:opacity-30"
                 aria-label="Gửi"
               >

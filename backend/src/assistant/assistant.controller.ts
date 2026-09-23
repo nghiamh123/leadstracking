@@ -5,11 +5,12 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 import { AssistantService } from './assistant.service.js';
 import { SendMessageDto } from './dto/send-message.dto.js';
+import { CreateConversationDto } from './dto/create-conversation.dto.js';
 
 /** Gửi comment SSE định kỳ để Nginx/proxy không cắt kết nối khi model đang suy nghĩ lâu. */
 const HEARTBEAT_MS = 15_000;
 
-// Mọi role đều vào được; role nào chưa có persona (sales) thì service trả 403 khi tạo/gửi tin.
+// Mọi role đều vào được; service kiểm tra role có được dùng persona của hội thoại không (PERSONAS_BY_ROLE).
 @UseGuards(JwtAuthGuard)
 @Controller('assistant')
 export class AssistantController {
@@ -26,8 +27,8 @@ export class AssistantController {
   }
 
   @Post('conversations')
-  createConversation(@CurrentUser() user: JwtPayload) {
-    return this.assistantService.createConversation(user);
+  createConversation(@CurrentUser() user: JwtPayload, @Body() dto: CreateConversationDto) {
+    return this.assistantService.createConversation(user, dto.persona);
   }
 
   @Get('conversations/:id/messages')

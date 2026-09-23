@@ -5,6 +5,7 @@ import { AssistantService } from './assistant.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { DashboardService } from '../dashboard/dashboard.service.js';
 import type { SeoInsightsService } from './seo/seo-insights.service.js';
+import type { LeadInsightsService } from './leads/lead-insights.service.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 
 const seoUser: JwtPayload = { sub: 'u1', email: 'seo@x.vn', role: 'seo', team: null };
@@ -38,12 +39,13 @@ function fakeClient(replies: ReturnType<typeof reply>[]) {
   return { client: { beta: { messages: { stream } } }, calls };
 }
 
-function setup(opts: { usedToday?: number; role?: JwtPayload['role'] } = {}) {
+function setup(opts: { usedToday?: number; role?: JwtPayload['role']; persona?: string } = {}) {
   const rows: { id: string; role: string; content: unknown; createdAt: Date }[] = [];
   const prisma = {
     assistantConversation: {
-      findFirst: vi.fn().mockResolvedValue({ id: 'c1', userId: 'u1', persona: 'seo', title: null }),
+      findFirst: vi.fn().mockResolvedValue({ id: 'c1', userId: 'u1', persona: opts.persona ?? 'seo', title: null }),
       update: vi.fn(),
+      create: vi.fn(({ data }) => data),
     },
     assistantMessage: {
       count: vi.fn().mockResolvedValue(opts.usedToday ?? 0),
@@ -65,6 +67,7 @@ function setup(opts: { usedToday?: number; role?: JwtPayload['role'] } = {}) {
     config,
     insights as unknown as SeoInsightsService,
     {} as DashboardService,
+    {} as LeadInsightsService,
   );
   const user = { ...seoUser, role: opts.role ?? 'seo' };
   return { service, rows, prisma, insights, user };
@@ -181,8 +184,8 @@ describe('AssistantService.sendMessage', () => {
     );
   });
 
-  it('role chưa có persona (sales) bị chặn', async () => {
-    const { service, user } = setup({ role: 'sales' });
+  it('không cho gửi tin vào hội thoại của trợ lý ngoài quyền role (vd role bị đổi sau khi tạo)', async () => {
+    const { service, user } = setup({ role: 'sales', persona: 'seo' });
     await expect(service.sendMessage(user, 'c1', 'hi')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -191,5 +194,22 @@ describe('AssistantService.sendMessage', () => {
     await expect(service.sendMessage(user, 'c1', 'hi')).rejects.toSatisfy(
       (e) => e instanceof HttpException && e.getStatus() === 429,
     );
+  });
+});
+
+describe('AssistantService persona theo role', () => {
+  it('status liệt kê trợ lý được dùng, mặc định đứng đầu', async () => {
+    const { service } = setup();
+    const admin = { ...seoUser, role: 'admin' as const };
+    expect((await service.status(admin)).personas.map((p) => p.key)).toEqual(['ops', 'seo']);
+    expect((await service.status({ ...seoUser, role: 'sales' })).personas.map((p) => p.key)).toEqual(['sales']);
+  });
+
+  it('tạo hội thoại: mặc định theo role, chặn persona ngoài quyền', async () => {
+    const { service } = setup();
+    const sales = { ...seoUser, role: 'sales' as const };
+    await expect(service.createConversation(sales)).resolves.toMatchObject({ persona: 'sales' });
+    await expect(service.createConversation(sales, 'seo')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.createConversation(seoUser, 'ops')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

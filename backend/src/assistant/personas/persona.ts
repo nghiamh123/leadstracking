@@ -24,7 +24,14 @@ export function defineTool<S extends z.ZodType>(tool: {
   return tool as AssistantTool;
 }
 
-export type PersonaKey = 'seo';
+export const PERSONA_KEYS = ['ops', 'seo', 'sales'] as const;
+export type PersonaKey = (typeof PERSONA_KEYS)[number];
+
+export const PERSONA_INFO: Record<PersonaKey, { label: string; description: string }> = {
+  ops: { label: 'Trợ lý vận hành', description: 'Phễu bán hàng, đội sales, lead bị bỏ quên' },
+  seo: { label: 'Trợ lý SEO', description: 'Traffic, từ khoá, hiệu quả website' },
+  sales: { label: 'Trợ lý bán hàng', description: 'Khách tiềm năng, chăm sóc khách, soạn tin nhắn' },
+};
 
 export interface Persona {
   key: PersonaKey;
@@ -33,12 +40,12 @@ export interface Persona {
 }
 
 /**
- * Persona theo role. `null` = role này chưa có trợ lý (sales chờ persona riêng - không cho
- * dùng tạm bot SEO vì sales hiện không có quyền xem dữ liệu từ khoá).
+ * Các trợ lý mỗi role được dùng - phần tử đầu là mặc định. Khớp quyền xem dữ liệu hiện có:
+ * sales không dùng bot SEO (không có quyền xem từ khoá), seo không dùng bot vận hành (không xem lead).
  */
-export const PERSONA_BY_ROLE: Record<Role, PersonaKey | null> = {
-  admin: 'seo',
-  manager: 'seo',
-  seo: 'seo',
-  sales: null,
+export const PERSONAS_BY_ROLE: Record<Role, PersonaKey[]> = {
+  admin: ['ops', 'seo'],
+  manager: ['ops', 'seo'],
+  seo: ['seo'],
+  sales: ['sales'],
 };
