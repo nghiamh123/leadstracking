@@ -23,6 +23,17 @@ export class ApiError extends Error {
   }
 }
 
+async function toApiError(res: Response): Promise<ApiError> {
+  let message = res.statusText;
+  try {
+    const body = await res.json();
+    message = Array.isArray(body.message) ? body.message.join(", ") : (body.message ?? message);
+  } catch {
+    // response body wasn't JSON - keep statusText
+  }
+  return new ApiError(message, res.status);
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -38,16 +49,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     },
   });
 
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      const body = await res.json();
-      message = Array.isArray(body.message) ? body.message.join(", ") : (body.message ?? message);
-    } catch {
-      // response body wasn't JSON - keep statusText
-    }
-    throw new ApiError(message, res.status);
-  }
+  if (!res.ok) throw await toApiError(res);
 
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -331,6 +333,136 @@ export const syncLogsApi = {
   rerun: (id: string) => apiFetch<unknown>(`/sync-logs/${id}/rerun`, { method: "POST" }),
   syncNow: (websiteId: string) =>
     apiFetch<unknown>("/sync-logs/sync", { method: "POST", body: JSON.stringify({ websiteId }) }),
+};
+
+// ---- Chăm sóc khách (lần liên hệ + lịch nhắc) ----
+export type LeadActivityType = "call" | "message" | "meeting" | "email" | "other";
+
+export interface LeadActivity {
+  id: string;
+  leadId: string;
+  type: LeadActivityType;
+  note: string | null;
+  happenedAt: string;
+  user: { name: string };
+}
+
+export interface Reminder {
+  id: string;
+  leadId: string;
+  userId: string;
+  dueAt: string;
+  note: string;
+  doneAt: string | null;
+  source: "manual" | "assistant";
+  lead?: { id: string; customerName: string; status: LeadStatus };
+  user?: { id: string; name: string };
+}
+
+export const followupsApi = {
+  care: (leadId: string) =>
+    apiFetch<{ activities: LeadActivity[]; reminders: Reminder[] }>(`/leads/${leadId}/care`),
+  logActivity: (leadId: string, data: { type: LeadActivityType; note?: string }) =>
+    apiFetch<LeadActivity>(`/leads/${leadId}/activities`, { method: "POST", body: JSON.stringify(data) }),
+  createReminder: (leadId: string, data: { dueAt: string; note: string }) =>
+    apiFetch<Reminder>(`/leads/${leadId}/reminders`, { method: "POST", body: JSON.stringify(data) }),
+  /** Lịch nhắc chưa xong của chính người dùng (gồm cả quá hạn), sắp theo hạn. */
+  myReminders: () => apiFetch<Reminder[]>("/reminders"),
+  setDone: (id: string, done: boolean) =>
+    apiFetch<Reminder>(`/reminders/${id}`, { method: "PATCH", body: JSON.stringify({ done }) }),
+  removeReminder: (id: string) => apiFetch<{ ok: true }>(`/reminders/${id}`, { method: "DELETE" }),
+};
+
+// ---- Trợ lý AI ----
+export type AssistantPersonaKey = "ops" | "seo" | "sales";
+
+export interface AssistantPersona {
+  key: AssistantPersonaKey;
+  label: string;
+  description: string;
+}
+
+export interface AssistantStatus {
+  /** Trợ lý mà role hiện tại được dùng; phần tử đầu là mặc định. */
+  personas: AssistantPersona[];
+  dailyLimit: number;
+  usedToday: number;
+  retentionDays: number;
+}
+
+export interface AssistantConversation {
+  id: string;
+  title: string | null;
+  persona: AssistantPersonaKey;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  text: string;
+  toolsUsed: string[];
+  createdAt: string;
+}
+
+export interface AssistantReply {
+  text: string;
+  toolsUsed: string[];
+  truncated: boolean;
+}
+
+export const assistantApi = {
+  status: () => apiFetch<AssistantStatus>("/assistant/status"),
+  conversations: () => apiFetch<AssistantConversation[]>("/assistant/conversations"),
+  createConversation: (persona: AssistantPersonaKey) =>
+    apiFetch<AssistantConversation>("/assistant/conversations", {
+      method: "POST",
+      body: JSON.stringify({ persona }),
+    }),
+  messages: (id: string) => apiFetch<AssistantMessage[]>(`/assistant/conversations/${id}/messages`),
+  remove: (id: string) =>
+    apiFetch<{ ok: true }>(`/assistant/conversations/${id}`, { method: "DELETE" }),
+
+  /**
+   * Gửi tin và đọc câu trả lời dạng Server-Sent Events. Dùng fetch + ReadableStream thay vì
+   * EventSource vì EventSource không gửi được POST body.
+   */
+  send: async (
+    id: string,
+    text: string,
+    handlers: { onText: (delta: string) => void; onTool: (label: string) => void },
+  ): Promise<AssistantReply> => {
+    const res = await fetch(`${API_BASE}/assistant/conversations/${id}/messages`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw await toApiError(res);
+    if (!res.body) throw new ApiError("Trình duyệt không hỗ trợ stream", 500);
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        const event = /^event: (.*)$/m.exec(raw)?.[1];
+        const data = /^data: (.*)$/m.exec(raw)?.[1];
+        if (!event || data === undefined) continue; // comment ": ping" giữ kết nối
+        const payload = JSON.parse(data);
+        if (event === "text") handlers.onText(payload.delta);
+        else if (event === "tool") handlers.onTool(payload.label);
+        else if (event === "done") return payload as AssistantReply;
+        else if (event === "error") throw new ApiError(payload.message, 500);
+      }
+    }
+    throw new ApiError("Mất kết nối trước khi trợ lý trả lời xong", 500);
+  },
 };
 
 export type { LeadChannel };
