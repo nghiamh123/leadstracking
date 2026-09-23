@@ -35,6 +35,8 @@ const MAX_TOKENS = 32_000;
 const RETENTION_DAYS = 90;
 
 export type ChatEvent =
+  /** Đã qua các bước kiểm tra, bắt đầu gọi model - controller mở luồng SSE ở đây. */
+  | { type: 'start' }
   | { type: 'text'; delta: string }
   | { type: 'tool'; name: string; label: string };
 
@@ -169,6 +171,7 @@ export class AssistantService {
         data: { conversationId, role: 'user', content: text },
       });
       turnRowIds.push(userRow.id);
+      onEvent({ type: 'start' });
       await this.prisma.assistantConversation.update({
         where: { id: conversationId },
         // Đổi updatedAt để cron xoá tính 90 ngày từ lần chat cuối.

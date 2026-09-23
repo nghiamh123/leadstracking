@@ -91,6 +91,7 @@ describe('AssistantService.sendMessage', () => {
     expect(res).toMatchObject({ text: 'Có 1 website.', toolsUsed: ['list_websites'], truncated: false });
     expect(res.usage).toEqual({ inputTokens: 200, outputTokens: 40, cacheReadTokens: 100 });
     expect(events).toEqual([
+      { type: 'start' },
       { type: 'tool', name: 'list_websites', label: 'Đang xem danh sách website…' },
       { type: 'text', delta: 'Có 1 website.' },
     ]);

@@ -5,6 +5,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Keywords } from "./pages/Keywords";
 import { Leads } from "./pages/Leads";
 import { Orders } from "./pages/Orders";
+import { Assistant } from "./pages/Assistant";
 import { AdminWebsites } from "./pages/admin/Websites";
 import { AdminUsers } from "./pages/admin/Users";
 import { AdminSyncLogs } from "./pages/admin/SyncLogs";
@@ -32,6 +33,7 @@ function App() {
         <Route path="/keywords" element={<Keywords />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/assistant" element={<Assistant />} />
         <Route path="/admin/websites" element={<AdminWebsites />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/sync-logs" element={<AdminSyncLogs />} />
