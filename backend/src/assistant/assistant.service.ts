@@ -45,7 +45,7 @@ export interface ChatResult {
   toolsUsed: string[];
   /** Model dừng vì hết max_tokens - câu trả lời có thể bị cắt. */
   truncated: boolean;
-  usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number };
+  usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
 }
 
 const NO_PERSONA_MESSAGE = 'Trợ lý AI cho vai trò của bạn đang được phát triển.';
@@ -219,7 +219,7 @@ export class AssistantService {
     const toolsByName = new Map(persona.tools.map((t) => [t.name, t]));
     const apiTools = persona.tools.map(toApiTool);
     const fallbacks = this.config.get<string>('ASSISTANT_FALLBACKS') ?? 'default';
-    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
     const texts: string[] = [];
     const toolsUsed: string[] = [];
     let jsonRetries = 0;
@@ -259,6 +259,7 @@ export class AssistantService {
       usage.inputTokens += message.usage.input_tokens;
       usage.outputTokens += message.usage.output_tokens;
       usage.cacheReadTokens += message.usage.cache_read_input_tokens ?? 0;
+      usage.cacheWriteTokens += message.usage.cache_creation_input_tokens ?? 0;
 
       if (message.stop_reason === 'refusal') {
         // Không lưu phần trả lời dở - lịch sử vẫn hợp lệ (2 tin user liền nhau được API gộp lại).
@@ -336,6 +337,7 @@ export class AssistantService {
         inputTokens: usage?.input_tokens,
         outputTokens: usage?.output_tokens,
         cacheReadTokens: usage?.cache_read_input_tokens ?? undefined,
+        cacheWriteTokens: usage?.cache_creation_input_tokens ?? undefined,
       },
     });
   }

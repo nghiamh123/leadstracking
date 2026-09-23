@@ -14,7 +14,7 @@ function reply(stop_reason: string, content: unknown[]) {
     stop_reason,
     stop_details: null,
     content,
-    usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 50 },
+    usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 50, cache_creation_input_tokens: 10 },
   };
 }
 
@@ -93,7 +93,7 @@ describe('AssistantService.sendMessage', () => {
     ]);
     expect(calls.map((c) => c.messageCount)).toEqual([1, 3]);
     expect(res).toMatchObject({ text: 'Có 1 website.', toolsUsed: ['list_websites'], truncated: false });
-    expect(res.usage).toEqual({ inputTokens: 200, outputTokens: 40, cacheReadTokens: 100 });
+    expect(res.usage).toEqual({ inputTokens: 200, outputTokens: 40, cacheReadTokens: 100, cacheWriteTokens: 20 });
     expect(events).toEqual([
       { type: 'start' },
       { type: 'tool', name: 'list_websites', label: 'Đang xem danh sách website…' },

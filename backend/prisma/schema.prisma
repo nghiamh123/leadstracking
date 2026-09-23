@@ -262,6 +262,7 @@ model AssistantMessage {
   inputTokens     Int?                 @map("input_tokens")
   outputTokens    Int?                 @map("output_tokens")
   cacheReadTokens Int?                 @map("cache_read_tokens")
+  cacheWriteTokens Int?                @map("cache_write_tokens")
   createdAt       DateTime             @default(now()) @map("created_at")
 
   conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
