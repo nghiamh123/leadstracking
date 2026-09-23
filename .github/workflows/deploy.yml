@@ -19,14 +19,14 @@ jobs:
       - name: Backend typecheck
         working-directory: backend
         run: |
-          npm install
+          npm ci
           npx prisma generate
           npx tsc --noEmit -p tsconfig.build.json
 
       - name: Frontend typecheck + build
         working-directory: app
         run: |
-          npm install
+          npm ci
           npx tsc -b --noEmit
 
   deploy:
@@ -43,16 +43,21 @@ jobs:
           script: |
             set -e
             cd /var/www/leadstracking
-            git pull origin main
+            # Thư mục deploy luôn khớp đúng origin/main - không kẹt vì file bị sửa trên server
+            # (.env không nằm trong git nên không bị ảnh hưởng).
+            git fetch origin main
+            git reset --hard origin/main
 
             cd backend
-            npm install
+            # npm ci cài đúng theo lockfile và không ghi lại nó (npm install trên VPS từng ghi
+            # đè package-lock.json khiến lần git pull sau bị từ chối).
+            npm ci
             npx prisma generate
             npm run build
             npx prisma migrate deploy
 
             cd ../app
-            npm install
+            npm ci
             npm run build
 
             pm2 restart funnel-api
