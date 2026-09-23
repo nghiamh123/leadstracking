@@ -72,7 +72,7 @@ function setup(opts: { usedToday?: number; role?: JwtPayload['role'] } = {}) {
 
 describe('AssistantService.sendMessage', () => {
   it('chạy tool rồi trả lời, lưu đủ các lượt theo đúng thứ tự', async () => {
-    const { service, rows, insights, user } = setup();
+    const { service, rows, insights, prisma, user } = setup();
     const { client, calls } = fakeClient([
       reply('tool_use', [{ type: 'tool_use', id: 't1', name: 'list_websites', input: {} }]),
       reply('end_turn', [{ type: 'text', text: 'Có 1 website.' }]),
@@ -83,6 +83,10 @@ describe('AssistantService.sendMessage', () => {
     const res = await service.sendMessage(user, 'c1', 'có bao nhiêu site?', (e) => events.push(e));
 
     expect(insights.listWebsites).toHaveBeenCalledOnce();
+    expect(prisma.assistantConversation.update).toHaveBeenLastCalledWith({
+      where: { id: 'c1' },
+      data: { title: 'có bao nhiêu site?' },
+    });
     expect(rows.map((r) => r.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
     expect(rows[2].content).toEqual([
       { type: 'tool_result', tool_use_id: 't1', content: JSON.stringify([{ id: 'w1', name: 'Site A' }]) },
@@ -158,7 +162,7 @@ describe('AssistantService.sendMessage', () => {
   });
 
   it('lỗi giữa chừng thì xoá toàn bộ lượt vừa lưu', async () => {
-    const { service, rows, user } = setup();
+    const { service, rows, prisma, user } = setup();
     let n = 0;
     const stream = vi.fn(() => ({
       on: () => {},
@@ -171,6 +175,10 @@ describe('AssistantService.sendMessage', () => {
 
     await expect(service.sendMessage(user, 'c1', 'hi')).rejects.toBeInstanceOf(HttpException);
     expect(rows).toEqual([]);
+    // Không đặt tên hội thoại theo câu hỏi đã bị xoá.
+    expect(prisma.assistantConversation.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: { title: 'hi' } }),
+    );
   });
 
   it('role chưa có persona (sales) bị chặn', async () => {

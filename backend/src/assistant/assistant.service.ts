@@ -172,17 +172,17 @@ export class AssistantService {
       });
       turnRowIds.push(userRow.id);
       onEvent({ type: 'start' });
+      // Đổi updatedAt để cron xoá tính 90 ngày từ lần chat cuối.
       await this.prisma.assistantConversation.update({
         where: { id: conversationId },
-        // Đổi updatedAt để cron xoá tính 90 ngày từ lần chat cuối.
-        data: { title: conversation.title ?? text.slice(0, 80), updatedAt: new Date() },
+        data: { updatedAt: new Date() },
       });
 
       const rows = await this.prisma.assistantMessage.findMany({
         where: { conversationId },
         orderBy: { createdAt: 'asc' },
       });
-      return await this.runLoop(
+      const result = await this.runLoop(
         client,
         conversationId,
         persona,
@@ -190,6 +190,14 @@ export class AssistantService {
         onEvent,
         turnRowIds,
       );
+      // Đặt tên sau khi trả lời xong - lượt lỗi bị xoá thì hội thoại không mang tên câu hỏi không có trong đó.
+      if (!conversation.title) {
+        await this.prisma.assistantConversation.update({
+          where: { id: conversationId },
+          data: { title: text.slice(0, 80) },
+        });
+      }
+      return result;
     } catch (err) {
       if (turnRowIds.length > 0) {
         await this.prisma.assistantMessage.deleteMany({ where: { id: { in: turnRowIds } } });
@@ -352,6 +360,13 @@ export class AssistantService {
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
       this.logger.error('ANTHROPIC_API_KEY không hợp lệ hoặc không có quyền', err);
       return new ServiceUnavailableException('Trợ lý AI đang gặp lỗi cấu hình, báo admin kiểm tra API key.');
+    }
+    if (err instanceof Anthropic.BadRequestError) {
+      // Request do chính server dựng nên 400 = lỗi cấu hình (key/workspace/model), không phải lỗi người dùng.
+      this.logger.error(`Claude API từ chối request: ${err.message}`);
+      return new ServiceUnavailableException(
+        'Trợ lý AI đang gặp lỗi cấu hình, báo admin kiểm tra API key/workspace.',
+      );
     }
     if (err instanceof Anthropic.RateLimitError) {
       return new HttpException('Trợ lý AI đang quá tải, thử lại sau ít phút.', HttpStatus.TOO_MANY_REQUESTS);
