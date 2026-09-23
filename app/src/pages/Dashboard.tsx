@@ -6,6 +6,8 @@ import { TrendChart } from "../components/ui/TrendChart";
 import { WebsiteTrendChart } from "../components/ui/WebsiteTrendChart";
 import { Select } from "../components/ui/Select";
 import { useWebsites, useUsers } from "../lib/hooks";
+import { useSession } from "../lib/session";
+import { TodayTasks } from "../components/followups/TodayTasks";
 import {
   dashboardApi,
   type DashboardSummary,
@@ -33,6 +35,7 @@ function deltaPct(current: number, prev: number) {
 const emptySummary: DashboardSummary = { clicks: 0, leadCount: 0, orderCount: 0 };
 
 export function Dashboard() {
+  const { currentUser } = useSession();
   const { websites } = useWebsites();
   const { users } = useUsers();
   const salesReps = users.filter((u) => u.role === "sales");
@@ -91,6 +94,8 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      {/* Lịch nhắc chăm sóc khách - chỉ các role làm việc với lead. */}
+      {currentUser?.role !== "seo" && <TodayTasks />}
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
         <Select
           label="Website"

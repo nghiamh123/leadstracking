@@ -36,7 +36,7 @@ export function buildOpsTools(
       name: 'get_team_workload',
       description:
         'Khối lượng việc HIỆN TẠI của từng nhân viên sales: số lead đang mở, số lead bị bỏ quên, lead mới trong 7 ngày, ' +
-        'lead mở lâu nhất (ngày). Có salesRepId để dùng với find_stale_leads.',
+        'lead mở lâu nhất (ngày), số lịch nhắc chăm sóc đã quá hạn. Có salesRepId để dùng với find_stale_leads.',
       statusLabel: 'Đang xem khối lượng việc của đội sales…',
       inputSchema: z.object({ staleDays }),
       run: (input) => deps.leads.teamWorkload(user, { staleDays: input.staleDays ?? 14 }),

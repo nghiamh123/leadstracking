@@ -64,6 +64,14 @@ enum AuditAction {
   delete
 }
 
+enum LeadActivityType {
+  call
+  message
+  meeting
+  email
+  other
+}
+
 /// `tool` = kết quả tool gửi lại cho model (gửi lên API với role "user"),
 /// tách riêng để đếm/cắt lịch sử theo tin nhắn thật của người dùng.
 enum AssistantMessageRole {
@@ -89,6 +97,8 @@ model User {
   createdOrders Order[]    @relation("OrderCreatedBy")
   auditLogs     AuditLog[]
   assistantConversations AssistantConversation[]
+  leadActivities         LeadActivity[]
+  reminders              Reminder[]
 
   @@map("users")
 }
@@ -170,6 +180,8 @@ model Lead {
   website   Website @relation(fields: [websiteId], references: [id])
   salesRep  User    @relation("LeadSalesRep", fields: [salesRepId], references: [id])
   createdBy User    @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  activities LeadActivity[]
+  reminders  Reminder[]
   orders    Order[]
 
   @@index([websiteId, date])
@@ -269,4 +281,43 @@ model AssistantMessage {
 
   @@index([conversationId, createdAt])
   @@map("assistant_messages")
+}
+
+/// Mỗi lần nhân viên liên hệ khách (gọi, nhắn, gặp...). Là nguồn "lần chăm sóc gần nhất" thật,
+/// thay cho updatedAt của lead (có thể chỉ là ngày import).
+model LeadActivity {
+  id         String           @id @default(cuid())
+  leadId     String           @map("lead_id")
+  userId     String           @map("user_id")
+  type       LeadActivityType
+  note       String?
+  happenedAt DateTime         @default(now()) @map("happened_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([leadId, happenedAt])
+  @@map("lead_activities")
+}
+
+/// Lịch nhắc chăm sóc khách - nhắc chính người tạo (userId), hiện trong mục "Việc cần làm".
+model Reminder {
+  id        String    @id @default(cuid())
+  leadId    String    @map("lead_id")
+  userId    String    @map("user_id")
+  dueAt     DateTime  @map("due_at")
+  note      String
+  doneAt    DateTime? @map("done_at")
+  /// "manual" (tạo trên trang Lead) | "assistant" (Trợ lý AI tạo theo yêu cầu người dùng)
+  source    String    @default("manual")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, doneAt, dueAt])
+  @@index([leadId])
+  @@map("reminders")
 }

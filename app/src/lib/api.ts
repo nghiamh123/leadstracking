@@ -335,6 +335,44 @@ export const syncLogsApi = {
     apiFetch<unknown>("/sync-logs/sync", { method: "POST", body: JSON.stringify({ websiteId }) }),
 };
 
+// ---- Chăm sóc khách (lần liên hệ + lịch nhắc) ----
+export type LeadActivityType = "call" | "message" | "meeting" | "email" | "other";
+
+export interface LeadActivity {
+  id: string;
+  leadId: string;
+  type: LeadActivityType;
+  note: string | null;
+  happenedAt: string;
+  user: { name: string };
+}
+
+export interface Reminder {
+  id: string;
+  leadId: string;
+  userId: string;
+  dueAt: string;
+  note: string;
+  doneAt: string | null;
+  source: "manual" | "assistant";
+  lead?: { id: string; customerName: string; status: LeadStatus };
+  user?: { id: string; name: string };
+}
+
+export const followupsApi = {
+  care: (leadId: string) =>
+    apiFetch<{ activities: LeadActivity[]; reminders: Reminder[] }>(`/leads/${leadId}/care`),
+  logActivity: (leadId: string, data: { type: LeadActivityType; note?: string }) =>
+    apiFetch<LeadActivity>(`/leads/${leadId}/activities`, { method: "POST", body: JSON.stringify(data) }),
+  createReminder: (leadId: string, data: { dueAt: string; note: string }) =>
+    apiFetch<Reminder>(`/leads/${leadId}/reminders`, { method: "POST", body: JSON.stringify(data) }),
+  /** Lịch nhắc chưa xong của chính người dùng (gồm cả quá hạn), sắp theo hạn. */
+  myReminders: () => apiFetch<Reminder[]>("/reminders"),
+  setDone: (id: string, done: boolean) =>
+    apiFetch<Reminder>(`/reminders/${id}`, { method: "PATCH", body: JSON.stringify({ done }) }),
+  removeReminder: (id: string) => apiFetch<{ ok: true }>(`/reminders/${id}`, { method: "DELETE" }),
+};
+
 // ---- Trợ lý AI ----
 export type AssistantPersonaKey = "ops" | "seo" | "sales";
 

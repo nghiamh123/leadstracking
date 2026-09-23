@@ -15,7 +15,9 @@ function fakeLead(over: Record<string, unknown> = {}) {
     interest: 'Ly thủy tinh - SL: 500',
     note: 'Công ty: ABC\nXử lý: Đã gửi báo giá, SĐT 0912 345 678',
     date: new Date('2026-09-01'),
-    updatedAt: new Date('2026-09-17'),
+    // Như dữ liệu import: updatedAt = createdAt (chưa ai sửa).
+    createdAt: new Date('2026-09-17T04:31:49Z'),
+    updatedAt: new Date('2026-09-17T04:31:49Z'),
     website: { name: 'Quà Tặng SG' },
     salesRep: { name: 'Oanh' },
     salesRepId: 'rep1',
@@ -75,11 +77,12 @@ describe('LeadInsightsService', () => {
 });
 
 describe('LeadInsightsService.staleLeads', () => {
-  const old = (id: string, updatedAt: string) =>
-    fakeLead({ id, date: new Date('2026-06-01'), updatedAt: new Date(updatedAt) });
+  const imported = new Date('2026-09-17T04:31:49Z');
+  const old = (id: string, over: Record<string, unknown> = {}) =>
+    fakeLead({ id, date: new Date('2026-06-01'), createdAt: imported, updatedAt: imported, activities: [], ...over });
 
-  it('bỏ qua ngày cập nhật khi đó là ngày import (mọi lead cùng một ngày)', async () => {
-    const leads = Array.from({ length: 12 }, (_, i) => old(`l${i}`, '2026-09-17T08:00:00Z'));
+  it('lead import chưa ai sửa: dựa vào ngày nhận lead, không coi ngày import là lần chăm sóc', async () => {
+    const leads = Array.from({ length: 12 }, (_, i) => old(`l${i}`));
     const service = new LeadInsightsService({
       lead: { findMany: vi.fn().mockResolvedValue(leads) },
     } as unknown as PrismaService);
@@ -88,18 +91,57 @@ describe('LeadInsightsService.staleLeads', () => {
 
     expect(res.total).toBe(12);
     expect(res.leads).toHaveLength(5);
-    expect(res.warning).toContain('import');
+    expect(res.leads[0].daysSinceUpdate).toBeNull();
   });
 
-  it('khi ngày cập nhật đáng tin thì loại lead vừa được cập nhật', async () => {
-    const leads = [old('cu', '2026-06-02T00:00:00Z'), old('vua-cap-nhat', new Date().toISOString())];
+  it('lead vừa được sửa (đổi trạng thái/ghi chú) không bị coi là bỏ quên', async () => {
+    const leads = [old('cu'), old('vua-sua', { updatedAt: new Date() })];
     const service = new LeadInsightsService({
       lead: { findMany: vi.fn().mockResolvedValue(leads) },
     } as unknown as PrismaService);
 
     const res = await service.staleLeads(sales, { staleDays: 14 });
 
-    expect(res.warning).toBeNull();
     expect(res.leads.map((l) => l.leadId)).toEqual(['cu']);
+  });
+});
+
+describe('LeadInsightsService - lần liên hệ thật', () => {
+  it('lead có lần liên hệ gần đây không bị coi là bỏ quên', async () => {
+    const leads = Array.from({ length: 12 }, (_, i) =>
+      fakeLead({ id: `l${i}`, date: new Date('2026-06-01'), activities: [] }),
+    );
+    leads[0] = fakeLead({
+      id: 'vua-goi',
+      date: new Date('2026-06-01'),
+      activities: [{ type: 'call', happenedAt: new Date(), note: 'Khách hẹn thứ 6' }],
+    });
+    const service = new LeadInsightsService({
+      lead: { findMany: vi.fn().mockResolvedValue(leads) },
+    } as unknown as PrismaService);
+
+    const res = await service.staleLeads(sales, { staleDays: 14, limit: 50 });
+
+    expect(res.total).toBe(11);
+    expect(res.leads.map((l) => l.leadId)).not.toContain('vua-goi');
+  });
+
+  it('tóm tắt lead có lastContact và nextReminder', async () => {
+    const service = new LeadInsightsService({
+      lead: {
+        findMany: vi.fn().mockResolvedValue([
+          fakeLead({
+            activities: [{ type: 'message', happenedAt: new Date('2026-09-20T03:00:00Z'), note: 'Gửi mẫu qua 0909123456' }],
+            reminders: [{ dueAt: new Date('2026-09-26T02:00:00Z'), note: 'Gọi hỏi kết quả' }],
+          }),
+        ]),
+        count: vi.fn().mockResolvedValue(1),
+      },
+    } as unknown as PrismaService);
+
+    const res = await service.myOpenLeads(sales, {});
+
+    expect(res.leads[0].lastContact).toMatchObject({ date: '2026-09-20', type: 'Nhắn tin', note: 'Gửi mẫu qua [SĐT]' });
+    expect(res.leads[0].nextReminder).toMatchObject({ due: '2026-09-26 09:00', note: 'Gọi hỏi kết quả' });
   });
 });

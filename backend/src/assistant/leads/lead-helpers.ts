@@ -1,4 +1,4 @@
-import type { LeadChannel, LeadStatus, OrderStatus } from '../../generated/prisma/enums.js';
+import type { LeadActivityType, LeadChannel, LeadStatus, OrderStatus } from '../../generated/prisma/enums.js';
 
 /** Hàm dùng chung cho persona Vận hành và Bán hàng (dữ liệu lead/đơn hàng). */
 
@@ -15,6 +15,14 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   dang_cham_soc: 'Đang chăm sóc',
   da_chuyen_don: 'Đã chuyển đơn',
   huy: 'Huỷ',
+};
+
+export const ACTIVITY_LABELS: Record<LeadActivityType, string> = {
+  call: 'Gọi điện',
+  message: 'Nhắn tin',
+  meeting: 'Gặp mặt',
+  email: 'Email',
+  other: 'Khác',
 };
 
 export const OPEN_STATUSES: LeadStatus[] = ['moi', 'dang_cham_soc'];

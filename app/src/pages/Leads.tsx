@@ -11,6 +11,8 @@ import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { Modal } from "../components/ui/Modal";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
+import { LeadCareModal } from "../components/followups/LeadCareModal";
+import { TodayTasks } from "../components/followups/TodayTasks";
 import { useWebsites, useUsers } from "../lib/hooks";
 import { leadsApi, ApiError, type SignalImportResult } from "../lib/api";
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, LEAD_STATUS_LABEL, LEAD_STATUS_OPTIONS } from "../lib/enumMap";
@@ -65,6 +67,9 @@ export function Leads() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<Lead | null>(null);
+  const [careFor, setCareFor] = useState<Lead | null>(null);
+  // Tăng lên sau khi đặt nhắc/ghi liên hệ để mục "Việc cần làm" tải lại.
+  const [tasksKey, setTasksKey] = useState(0);
   const [historyEntries, setHistoryEntries] = useState<AuditLogEntry[]>([]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -294,6 +299,8 @@ export function Leads() {
 
       {tab === "list" ? (
         <>
+          <TodayTasks refreshKey={tasksKey} />
+
           <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
             <Select
               label="Website"
@@ -401,6 +408,15 @@ export function Leads() {
                                 className="block w-full px-3 py-2 text-sm text-ink-soft hover:bg-surface-alt"
                               >
                                 Sửa
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCareFor(lead);
+                                  setOpenMenu(null);
+                                }}
+                                className="block w-full px-3 py-2 text-sm text-ink-soft hover:bg-surface-alt"
+                              >
+                                Chăm sóc khách
                               </button>
                               <button
                                 onClick={() => openHistory(lead)}
@@ -606,6 +622,14 @@ export function Leads() {
             </button>
           </div>
         </div>
+      )}
+
+      {careFor && (
+        <LeadCareModal
+          lead={careFor}
+          onClose={() => setCareFor(null)}
+          onChanged={() => setTasksKey((k) => k + 1)}
+        />
       )}
 
       {historyFor && (

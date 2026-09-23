@@ -29,6 +29,7 @@ import { buildSeoPersona } from './seo/seo.persona.js';
 import { LeadInsightsService } from './leads/lead-insights.service.js';
 import { buildOpsPersona } from './ops/ops.persona.js';
 import { buildSalesPersona } from './sales/sales.persona.js';
+import { FollowupsService } from '../followups/followups.service.js';
 import { startOfTodayVn, textOf, toApiMessages, toDisplayMessages, trimHistory } from './history.js';
 
 type BetaMessage = Anthropic.Beta.BetaMessage;
@@ -74,6 +75,7 @@ export class AssistantService {
     private insights: SeoInsightsService,
     private dashboard: DashboardService,
     private leads: LeadInsightsService,
+    private followups: FollowupsService,
   ) {}
 
   /** Dựng persona cho user; null nếu role của user không được dùng persona này. */
@@ -85,7 +87,7 @@ export class AssistantService {
       case 'ops':
         return buildOpsPersona({ leads: this.leads, dashboard: this.dashboard }, user);
       case 'sales':
-        return buildSalesPersona({ leads: this.leads }, user);
+        return buildSalesPersona({ leads: this.leads, followups: this.followups }, user);
     }
   }
 

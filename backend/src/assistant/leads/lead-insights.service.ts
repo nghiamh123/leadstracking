@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { leadOrderScope } from '../../common/scope.js';
 import type { Prisma } from '../../generated/prisma/client.js';
-import type { LeadStatus } from '../../generated/prisma/enums.js';
+import type { LeadActivityType, LeadStatus } from '../../generated/prisma/enums.js';
+import { startOfTodayVn, vnDate, vnTime } from '../../common/vn-time.js';
 import type { JwtPayload } from '../../common/types/jwt-payload.js';
 import { clampLimit } from '../seo/seo-insights.service.js';
 import {
+  ACTIVITY_LABELS,
   CHANNEL_LABELS,
   OPEN_STATUSES,
   STATUS_LABELS,
@@ -17,6 +19,21 @@ import {
 } from './lead-helpers.js';
 
 export type FunnelGroupBy = 'channel' | 'website' | 'sales_rep';
+
+/** Lần liên hệ gần nhất + lịch nhắc sắp tới của mỗi lead (dùng trong include). */
+const careInclude = {
+  activities: {
+    orderBy: { happenedAt: 'desc' },
+    take: 1,
+    select: { type: true, happenedAt: true, note: true },
+  },
+  reminders: {
+    where: { doneAt: null },
+    orderBy: { dueAt: 'asc' },
+    take: 1,
+    select: { dueAt: true, note: true },
+  },
+} as const;
 
 /**
  * Truy vấn lead/đơn hàng cho persona Vận hành (admin/manager) và Bán hàng (sales).
@@ -88,33 +105,64 @@ export class LeadInsightsService {
 
   /** Khối lượng việc hiện tại của từng nhân viên sales (lead đang mở, lead bị bỏ lâu). */
   async teamWorkload(user: JwtPayload, params: { staleDays: number }) {
-    const open = await this.prisma.lead.findMany({
-      where: this.leadWhere(user, { status: { in: OPEN_STATUSES } }),
-      select: { date: true, updatedAt: true, salesRepId: true, salesRep: { select: { name: true } } },
-    });
+    const [open, overdue] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: this.leadWhere(user, { status: { in: OPEN_STATUSES } }),
+        select: {
+          date: true,
+          createdAt: true,
+          updatedAt: true,
+          salesRepId: true,
+          salesRep: { select: { name: true } },
+          activities: careInclude.activities,
+        },
+      }),
+      this.prisma.reminder.findMany({
+        where: { doneAt: null, dueAt: { lt: startOfTodayVn() }, lead: this.leadWhere(user) },
+        select: { lead: { select: { salesRepId: true } } },
+      }),
+    ]);
     const staleBefore = daysAgo(params.staleDays);
     const weekAgo = daysAgo(7);
-    const warning = importedDatesWarning(open.map((l) => l.updatedAt));
 
     const byRep = new Map<
       string,
-      { salesRepId: string; salesRep: string; openLeads: number; staleLeads: number; newLast7Days: number; oldestOpenDays: number }
+      {
+        salesRepId: string;
+        salesRep: string;
+        openLeads: number;
+        staleLeads: number;
+        newLast7Days: number;
+        oldestOpenDays: number;
+        overdueReminders: number;
+      }
     >();
     for (const l of open) {
       let r = byRep.get(l.salesRepId);
       if (!r) {
-        r = { salesRepId: l.salesRepId, salesRep: l.salesRep.name, openLeads: 0, staleLeads: 0, newLast7Days: 0, oldestOpenDays: 0 };
+        r = {
+          salesRepId: l.salesRepId,
+          salesRep: l.salesRep.name,
+          openLeads: 0,
+          staleLeads: 0,
+          newLast7Days: 0,
+          oldestOpenDays: 0,
+          overdueReminders: 0,
+        };
         byRep.set(l.salesRepId, r);
       }
       r.openLeads++;
-      if (isStale(l, staleBefore, warning !== null)) r.staleLeads++;
+      if (isStale(l, staleBefore)) r.staleLeads++;
       if (l.date >= weekAgo) r.newLast7Days++;
       r.oldestOpenDays = Math.max(r.oldestOpenDays, daysSince(l.date));
     }
+    for (const o of overdue) {
+      const r = byRep.get(o.lead.salesRepId);
+      if (r) r.overdueReminders++;
+    }
 
     return {
-      staleDefinition: staleDefinition(params.staleDays, warning !== null),
-      warning,
+      staleDefinition: staleDefinition(params.staleDays),
       reps: [...byRep.values()].sort((a, b) => b.openLeads - a.openLeads),
     };
   }
@@ -122,7 +170,7 @@ export class LeadInsightsService {
   /** Lead đang mở bị bỏ lâu - cũ nhất trước. */
   async staleLeads(user: JwtPayload, params: { staleDays: number; salesRepId?: string; limit?: number }) {
     const staleBefore = daysAgo(params.staleDays);
-    // Lọc updatedAt trong bộ nhớ (không trong SQL) vì cần biết ngày cập nhật có phải ngày import không.
+    // Lọc "lần chăm sóc gần nhất" trong bộ nhớ vì nó gộp từ lần liên hệ, lần sửa lead và ngày nhận lead.
     const candidates = await this.prisma.lead.findMany({
       where: this.leadWhere(
         user,
@@ -130,15 +178,13 @@ export class LeadInsightsService {
         { date: { lt: staleBefore } },
         params.salesRepId ? { salesRepId: params.salesRepId } : {},
       ),
-      include: { website: { select: { name: true } }, salesRep: { select: { name: true } } },
+      include: { website: { select: { name: true } }, salesRep: { select: { name: true } }, ...careInclude },
       orderBy: { date: 'asc' },
     });
-    const warning = importedDatesWarning(candidates.map((r) => r.updatedAt));
-    const stale = candidates.filter((r) => isStale(r, staleBefore, warning !== null));
+    const stale = candidates.filter((r) => isStale(r, staleBefore));
     const rows = stale.slice(0, clampLimit(params.limit));
     return {
-      staleDefinition: staleDefinition(params.staleDays, warning !== null),
-      warning,
+      staleDefinition: staleDefinition(params.staleDays),
       total: stale.length,
       leads: rows.map((r) => ({
         ...leadSummary(r, 200),
@@ -158,6 +204,7 @@ export class LeadInsightsService {
       include: {
         website: { select: { name: true } },
         _count: { select: { orders: { where: { deletedAt: null } } } },
+        ...careInclude,
       },
       orderBy: { date: params.sort === 'oldest' ? 'asc' : 'desc' },
       take: clampLimit(params.limit ?? 30),
@@ -168,7 +215,6 @@ export class LeadInsightsService {
     return {
       total,
       shown: rows.length,
-      warning: importedDatesWarning(rows.map((r) => r.updatedAt)),
       leads: rows.map((r) => ({ ...leadSummary(r, 400), orderCount: r._count.orders })),
     };
   }
@@ -178,7 +224,7 @@ export class LeadInsightsService {
     const q = { contains: params.query, mode: 'insensitive' as const };
     const rows = await this.prisma.lead.findMany({
       where: this.leadWhere(user, { OR: [{ customerName: q }, { note: q }, { interest: q }] }),
-      include: { website: { select: { name: true } }, salesRep: { select: { name: true } } },
+      include: { website: { select: { name: true } }, salesRep: { select: { name: true } }, ...careInclude },
       orderBy: { date: 'desc' },
       take: clampLimit(params.limit),
     });
@@ -197,6 +243,12 @@ export class LeadInsightsService {
           select: { date: true, product: true, value: true, status: true },
           orderBy: { date: 'desc' },
         },
+        activities: {
+          orderBy: { happenedAt: 'desc' },
+          take: 10,
+          select: { type: true, happenedAt: true, note: true, user: { select: { name: true } } },
+        },
+        reminders: { where: { doneAt: null }, orderBy: { dueAt: 'asc' }, select: { dueAt: true, note: true } },
       },
     });
     // Ngoài quyền xem thì trả như không tồn tại - không để lộ lead của người khác.
@@ -212,6 +264,13 @@ export class LeadInsightsService {
       ...leadSummary(lead, 2000),
       salesRep: lead.salesRep.name,
       orders: lead.orders.map((o) => ({ ...o, date: o.date.toISOString().slice(0, 10) })),
+      contactHistory: lead.activities.map((a) => ({
+        date: vnDate(a.happenedAt),
+        type: ACTIVITY_LABELS[a.type],
+        by: a.user.name,
+        note: maskContactInfo(a.note),
+      })),
+      openReminders: lead.reminders.map(formatReminder),
       history: history.map((h) => ({
         at: h.changedAt.toISOString().slice(0, 10),
         by: h.changedBy.name,
@@ -233,11 +292,16 @@ function leadSummary(
     interest: string;
     note: string | null;
     date: Date;
+    createdAt: Date;
     updatedAt: Date;
     website: { name: string };
+    activities?: { type: LeadActivityType; happenedAt: Date; note: string | null }[];
+    reminders?: { dueAt: Date; note: string }[];
   },
   noteMax: number,
 ) {
+  const last = r.activities?.[0];
+  const next = r.reminders?.[0];
   return {
     leadId: r.id,
     customer: r.customerName,
@@ -247,33 +311,50 @@ function leadSummary(
     interest: maskContactInfo(r.interest),
     leadDate: r.date.toISOString().slice(0, 10),
     daysSinceLead: daysSince(r.date),
-    daysSinceUpdate: daysSince(r.updatedAt),
+    // null = chưa sửa gì kể từ khi tạo/import (updatedAt lúc đó chỉ là thời điểm tạo, không phải lần chăm sóc).
+    daysSinceUpdate: wasEdited(r) ? daysSince(r.updatedAt) : null,
     note: excerpt(maskContactInfo(r.note), noteMax),
+    // Lần liên hệ thật gần nhất (sales ghi lại) - đáng tin hơn daysSinceUpdate.
+    lastContact: last
+      ? {
+          date: vnDate(last.happenedAt),
+          daysAgo: daysSince(last.happenedAt),
+          type: ACTIVITY_LABELS[last.type],
+          note: excerpt(maskContactInfo(last.note), 150),
+        }
+      : null,
+    nextReminder: next ? formatReminder(next) : null,
   };
 }
 
-/**
- * Lead mở bị bỏ quên: nhận đã lâu và lâu không cập nhật. Khi ngày cập nhật chỉ là ngày import
- * (không phản ánh lần liên hệ thật) thì chỉ xét tuổi lead - nếu không, mọi lead import gần đây
- * đều bị coi là "vừa cập nhật" và danh sách luôn rỗng.
- */
-function isStale(l: { date: Date; updatedAt: Date }, staleBefore: Date, updatesUnreliable: boolean): boolean {
-  return l.date < staleBefore && (updatesUnreliable || l.updatedAt < staleBefore);
+function formatReminder(r: { dueAt: Date; note: string }) {
+  return {
+    due: `${vnDate(r.dueAt)} ${vnTime(r.dueAt)}`,
+    overdue: r.dueAt < startOfTodayVn(),
+    note: excerpt(maskContactInfo(r.note), 150),
+  };
 }
 
-function staleDefinition(staleDays: number, updatesUnreliable: boolean): string {
-  return updatesUnreliable
-    ? `Lead đang mở, nhận từ hơn ${staleDays} ngày trước (không xét ngày cập nhật vì đó là ngày import)`
-    : `Lead đang mở, nhận từ hơn ${staleDays} ngày trước và không được cập nhật trong ${staleDays} ngày`;
+/** Lead được sửa sau khi tạo (đổi trạng thái, ghi chú, ghi liên hệ...) - import hàng loạt thì updatedAt = createdAt. */
+function wasEdited(l: { createdAt: Date; updatedAt: Date }): boolean {
+  return l.updatedAt.getTime() - l.createdAt.getTime() > 60_000;
 }
 
 /**
- * Dữ liệu import hàng loạt làm mọi lead có cùng ngày cập nhật - khi đó "số ngày chưa cập nhật"
- * không phản ánh lần liên hệ thật, model phải nói rõ thay vì kết luận sales bỏ bê khách.
+ * Lần chăm sóc gần nhất: lần liên hệ sales ghi lại > lần sửa lead > ngày nhận lead.
+ * Không dùng updatedAt của lead chưa từng được sửa - lúc đó nó chỉ là thời điểm tạo/import.
  */
-export function importedDatesWarning(updatedAts: Date[]): string | null {
-  if (updatedAts.length < 10) return null;
-  const days = new Set(updatedAts.map((d) => d.toISOString().slice(0, 10)));
-  if (days.size > 1) return null;
-  return `Tất cả ${updatedAts.length} lead có cùng ngày cập nhật (${[...days][0]}) - nhiều khả năng là ngày import dữ liệu, không phản ánh lần liên hệ khách thật. "daysSinceUpdate" không đáng tin.`;
+function lastTouch(l: { date: Date; createdAt: Date; updatedAt: Date; activities?: { happenedAt: Date }[] }): Date {
+  return l.activities?.[0]?.happenedAt ?? (wasEdited(l) ? l.updatedAt : l.date);
+}
+
+function isStale(
+  l: { date: Date; createdAt: Date; updatedAt: Date; activities?: { happenedAt: Date }[] },
+  staleBefore: Date,
+): boolean {
+  return l.date < staleBefore && lastTouch(l) < staleBefore;
+}
+
+function staleDefinition(staleDays: number): string {
+  return `Lead đang mở, nhận từ hơn ${staleDays} ngày trước và không có lần liên hệ/cập nhật nào trong ${staleDays} ngày qua`;
 }

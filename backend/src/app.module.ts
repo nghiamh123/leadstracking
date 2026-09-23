@@ -12,6 +12,7 @@ import { LeadsModule } from './leads/leads.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { AssistantModule } from './assistant/assistant.module.js';
+import { FollowupsModule } from './followups/followups.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AssistantModule } from './assistant/assistant.module.js';
     LeadsModule,
     OrdersModule,
     DashboardModule,
+    FollowupsModule,
     AssistantModule,
   ],
 })

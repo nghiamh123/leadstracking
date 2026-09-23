@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { daysSince, maskContactInfo, summarizeFunnel } from './lead-helpers.js';
-import { importedDatesWarning } from './lead-insights.service.js';
 
 describe('maskContactInfo', () => {
   it('che số điện thoại VN và email trong ghi chú', () => {
@@ -56,18 +55,5 @@ describe('summarizeFunnel', () => {
     });
     expect(res.total).toMatchObject({ leads: 5, orders: 2, revenue: 12_000_000, convertedPercent: 20 });
     expect(res.groups.map((g) => g.group)).toEqual(['Zalo', 'Form web', 'Đơn không gắn lead']);
-  });
-});
-
-describe('importedDatesWarning', () => {
-  it('cảnh báo khi mọi lead cùng một ngày cập nhật', () => {
-    const same = Array.from({ length: 12 }, () => new Date('2026-09-17T08:00:00Z'));
-    expect(importedDatesWarning(same)).toContain('2026-09-17');
-  });
-
-  it('không cảnh báo khi ngày cập nhật khác nhau hoặc quá ít lead', () => {
-    const mixed = Array.from({ length: 12 }, (_, i) => new Date(`2026-09-${10 + i}T08:00:00Z`));
-    expect(importedDatesWarning(mixed)).toBeNull();
-    expect(importedDatesWarning([new Date()])).toBeNull();
   });
 });

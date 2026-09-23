@@ -45,12 +45,12 @@ const PERSONA_UI: Record<AssistantPersonaKey, { intro: string; suggestions: stri
   },
   sales: {
     intro:
-      "Hỏi nên liên hệ khách nào trước, nhờ soạn tin nhắn chăm sóc khách. Trợ lý chỉ xem lead của chính bạn, không xem số điện thoại.",
+      "Hỏi nên liên hệ khách nào trước, nhờ soạn tin nhắn, đặt lịch nhắc hoặc ghi lại lần vừa liên hệ. Trợ lý chỉ xem lead của chính bạn, không xem số điện thoại.",
     suggestions: [
       "Hôm nay nên liên hệ lại khách nào trước?",
       "Khách nào đã nhận báo giá mà chưa chốt?",
       "Soạn tin nhắn Zalo hỏi thăm khách đã nhận báo giá",
-      "Kết quả bán hàng của tôi tháng này thế nào?",
+      "Tôi có lịch nhắc nào sắp tới?",
     ],
   },
 };
@@ -69,6 +69,9 @@ const TOOL_LABELS: Record<string, string> = {
   search_my_leads: "Tìm khách",
   get_lead_detail: "Chi tiết khách",
   get_my_performance: "Kết quả bán hàng",
+  list_my_reminders: "Lịch nhắc",
+  create_reminder: "Tạo lịch nhắc",
+  log_contact: "Ghi lần liên hệ",
 };
 
 /** Câu trả lời đang stream: phần chữ đã nhận + tool đang chạy (nếu có). */

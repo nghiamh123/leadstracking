@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { AssistantMessageRole } from '../generated/prisma/enums.js';
+import { startOfTodayVn, vnDate } from '../common/vn-time.js';
 
 type BetaMessageParam = Anthropic.Beta.BetaMessageParam;
 type BetaContentBlock = Anthropic.Beta.BetaContentBlock;
@@ -10,19 +11,7 @@ export interface StoredMessage {
   createdAt: Date;
 }
 
-const VN_OFFSET_MS = 7 * 3_600_000;
-
-/** Ngày YYYY-MM-DD theo giờ Việt Nam (UTC+7, không có giờ mùa hè). */
-export function vnDate(d: Date): string {
-  return new Date(d.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-/** 00:00 hôm nay theo giờ Việt Nam, trả về dạng Date (UTC). */
-export function startOfTodayVn(now = new Date()): Date {
-  const vn = new Date(now.getTime() + VN_OFFSET_MS);
-  vn.setUTCHours(0, 0, 0, 0);
-  return new Date(vn.getTime() - VN_OFFSET_MS);
-}
+export { startOfTodayVn, vnDate };
 
 /**
  * Chỉ giữ `maxTurns` lượt hỏi gần nhất. Cắt đúng tại tin nhắn của người dùng để

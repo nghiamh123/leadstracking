@@ -6,6 +6,7 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { DashboardService } from '../dashboard/dashboard.service.js';
 import type { SeoInsightsService } from './seo/seo-insights.service.js';
 import type { LeadInsightsService } from './leads/lead-insights.service.js';
+import type { FollowupsService } from '../followups/followups.service.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 
 const seoUser: JwtPayload = { sub: 'u1', email: 'seo@x.vn', role: 'seo', team: null };
@@ -68,6 +69,7 @@ function setup(opts: { usedToday?: number; role?: JwtPayload['role']; persona?: 
     insights as unknown as SeoInsightsService,
     {} as DashboardService,
     {} as LeadInsightsService,
+    {} as FollowupsService,
   );
   const user = { ...seoUser, role: opts.role ?? 'seo' };
   return { service, rows, prisma, insights, user };
