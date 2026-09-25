@@ -7,6 +7,7 @@ import { Leads } from "./pages/Leads";
 import { Orders } from "./pages/Orders";
 import { Assistant } from "./pages/Assistant";
 import { AdminWebsites } from "./pages/admin/Websites";
+import { AdminHostings } from "./pages/admin/Hostings";
 import { AdminUsers } from "./pages/admin/Users";
 import { AdminSyncLogs } from "./pages/admin/SyncLogs";
 import { useSession } from "./lib/session";
@@ -35,6 +36,7 @@ function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/admin/websites" element={<AdminWebsites />} />
+        <Route path="/admin/hostings" element={<AdminHostings />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/sync-logs" element={<AdminSyncLogs />} />
       </Route>

@@ -10,6 +10,18 @@ export interface Website {
   keywordsCsvUrl?: string | null;
 }
 
+export interface HostingAccount {
+  id: string;
+  websiteId: string;
+  label: string;
+  loginUrl: string;
+  username: string | null;
+  note: string | null;
+  /** Mật khẩu không bao giờ trả trong danh sách - xem qua hostingsApi.revealPassword. */
+  hasPassword: boolean;
+  website: { id: string; name: string; domain: string };
+}
+
 export interface Keyword {
   websiteId: string;
   websiteName: string;

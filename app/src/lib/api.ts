@@ -10,6 +10,7 @@ import type {
   Role,
   SyncLogEntry,
   Website,
+  HostingAccount,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
@@ -121,6 +122,27 @@ export const websitesApi = {
       body: form,
     });
   },
+};
+
+// ---- Hosting ----
+export interface HostingInput {
+  websiteId: string;
+  label?: string;
+  loginUrl: string;
+  username?: string;
+  /** Khi sửa: không gửi = giữ nguyên, chuỗi rỗng = xoá mật khẩu đã lưu. */
+  password?: string;
+  note?: string;
+}
+
+export const hostingsApi = {
+  list: () => apiFetch<HostingAccount[]>("/hostings"),
+  create: (data: HostingInput) =>
+    apiFetch<HostingAccount>("/hostings", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<HostingInput>) =>
+    apiFetch<HostingAccount>(`/hostings/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  remove: (id: string) => apiFetch<{ ok: true }>(`/hostings/${id}`, { method: "DELETE" }),
+  revealPassword: (id: string) => apiFetch<{ password: string }>(`/hostings/${id}/password`),
 };
 
 // ---- Users ----

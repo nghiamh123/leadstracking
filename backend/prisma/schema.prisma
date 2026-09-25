@@ -121,6 +121,7 @@ model Website {
   leads        Lead[]
   orders       Order[]
   syncLogs     SyncLog[]
+  hostings     HostingAccount[]
 
   @@map("websites")
 }
@@ -320,4 +321,25 @@ model Reminder {
   @@index([userId, doneAt, dueAt])
   @@index([leadId])
   @@map("reminders")
+}
+
+/// Tài khoản đăng nhập hosting/quản trị của từng website (chỉ admin xem được).
+/// Mật khẩu phải xem lại được nên không băm mà mã hoá AES-256-GCM bằng HOSTING_SECRET_KEY
+/// (xem src/common/secret-box.ts) - lộ database cũng không đọc được nếu không có key.
+model HostingAccount {
+  id                String   @id @default(cuid())
+  websiteId         String   @map("website_id")
+  /// VD: "Hosting", "cPanel", "Tên miền", "WordPress admin"
+  label             String   @default("Hosting")
+  loginUrl          String   @map("login_url")
+  username          String?
+  passwordEncrypted String?  @map("password_encrypted")
+  note              String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@map("hosting_accounts")
 }
