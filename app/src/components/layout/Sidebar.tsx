@@ -9,6 +9,7 @@ import {
   Globe,
   ClockCounterClockwise,
   Sparkle,
+  HardDrives,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { Role } from "../../lib/types";
@@ -21,6 +22,7 @@ const iconByPath: Record<string, ReactNode> = {
   "/orders": <ShoppingCart size={18} />,
   "/assistant": <Sparkle size={18} />,
   "/admin/websites": <Globe size={18} />,
+  "/admin/hostings": <HardDrives size={18} />,
   "/admin/users": <UsersThree size={18} />,
   "/admin/sync-logs": <ClockCounterClockwise size={18} />,
 };

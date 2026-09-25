@@ -13,6 +13,7 @@ const titleByPath: Record<string, string> = {
   "/orders": "Đơn hàng",
   "/assistant": "Trợ lý AI",
   "/admin/websites": "Quản trị · Website",
+  "/admin/hostings": "Quản trị · Hosting",
   "/admin/users": "Quản trị · Người dùng",
   "/admin/sync-logs": "Quản trị · Nhật ký đồng bộ",
 };
