@@ -93,7 +93,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       {/* Lịch nhắc chăm sóc khách - chỉ các role làm việc với lead. */}
       {currentUser?.role !== "seo" && <TodayTasks />}
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">

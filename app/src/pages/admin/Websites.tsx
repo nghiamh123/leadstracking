@@ -223,7 +223,7 @@ export function AdminWebsites() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">
           Danh sách website đang đồng bộ Traffic/Từ khóa từ Google Search Console (qua CSV).

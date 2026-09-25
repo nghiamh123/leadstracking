@@ -222,7 +222,7 @@ export function Leads() {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-lg border border-border bg-surface p-1">
           <button
@@ -383,7 +383,7 @@ export function Leads() {
                           {websites.find((w) => w.id === lead.websiteId)?.name}
                         </td>
                         <td className="px-6 py-3 text-muted">{CHANNEL_LABEL[lead.channel]}</td>
-                        <td className="px-6 py-3 text-muted">{lead.interest}</td>
+                        <td className="min-w-[220px] whitespace-normal px-6 py-3 text-muted">{lead.interest}</td>
                         <td className="px-6 py-3 text-muted">
                           {salesReps.find((r) => r.id === lead.salesRepId)?.name ?? "—"}
                         </td>
