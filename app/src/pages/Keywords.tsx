@@ -74,7 +74,7 @@ export function Keywords() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
         <Select
           label="Website"

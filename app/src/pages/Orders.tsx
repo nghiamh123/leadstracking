@@ -159,7 +159,7 @@ export function Orders() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-lg border border-border bg-surface p-1">
           <button

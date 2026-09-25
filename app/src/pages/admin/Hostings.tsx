@@ -205,7 +205,7 @@ export function AdminHostings() {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted">
           Link đăng nhập hosting của từng website. Bấm vào link để mở trang hosting ở cửa sổ mới,
@@ -258,7 +258,7 @@ export function AdminHostings() {
                         </span>
                         <ArrowSquareOut size={14} className="shrink-0" />
                       </button>
-                      <p className="mt-0.5 text-xs text-muted">
+                      <p className="mt-0.5 max-w-[320px] whitespace-normal text-xs text-muted">
                         {h.label}
                         {h.note && ` · ${h.note}`}
                       </p>

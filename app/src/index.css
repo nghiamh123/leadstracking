@@ -39,6 +39,16 @@ body {
   min-height: 100vh;
 }
 
+/* Bảng không tự xuống dòng (tên, email, nút "Đặt lại MK"...) - thiếu chỗ thì cuộn ngang trong
+   khung overflow-x-auto. Ô chứa văn bản dài tự bật lại bằng class whitespace-normal. Đặt trong
+   @layer base để utility của Tailwind vẫn ghi đè được. */
+@layer base {
+  th,
+  td {
+    white-space: nowrap;
+  }
+}
+
 ::selection {
   background: var(--color-pale-yellow);
   color: var(--color-ink);

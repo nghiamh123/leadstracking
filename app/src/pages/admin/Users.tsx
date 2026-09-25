@@ -89,7 +89,7 @@ export function AdminUsers() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">
           Quản lý tài khoản và phân quyền theo vai trò trong hệ thống.

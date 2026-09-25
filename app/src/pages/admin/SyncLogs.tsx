@@ -80,7 +80,7 @@ export function AdminSyncLogs() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <p className="text-sm text-muted">
         Nhật ký đồng bộ dữ liệu Traffic/Từ khóa (đọc từ Google Sheets CSV). Job
         chạy tự động hằng ngày lúc 02:00.
@@ -155,7 +155,7 @@ export function AdminSyncLogs() {
                           {statusLabel[log.status]}
                         </Badge>
                         {log.message && (
-                          <span className="text-xs text-pale-red-ink">{log.message}</span>
+                          <span className="min-w-[220px] whitespace-normal text-xs text-pale-red-ink">{log.message}</span>
                         )}
                       </div>
                     </td>
