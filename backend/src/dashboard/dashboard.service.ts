@@ -98,7 +98,7 @@ export class DashboardService {
       return row;
     });
 
-    return { websites: websites.map((w) => ({ id: w.id, name: w.name })), data };
+    return { websites: websites.map((w) => ({ id: w.id, name: w.name, domain: w.domain })), data };
   }
 
   async byWebsite(user: JwtPayload, query: Omit<DashboardQuery, 'websiteId'>) {

@@ -34,13 +34,16 @@ function deltaPct(current: number, prev: number) {
 
 const emptySummary: DashboardSummary = { clicks: 0, leadCount: 0, orderCount: 0 };
 
+const DEFAULT_WEBSITE_DOMAIN = "quatangsg.vn";
+
 export function Dashboard() {
   const { currentUser } = useSession();
-  const { websites } = useWebsites();
+  const { websites, loading: websitesLoading } = useWebsites();
   const { users } = useUsers();
   const salesReps = users.filter((u) => u.role === "sales");
 
   const [websiteId, setWebsiteId] = useState("all");
+  const [defaultApplied, setDefaultApplied] = useState(false);
   const [repId, setRepId] = useState("all");
   const [preset, setPreset] = useState<RangePreset>("30d");
 
@@ -56,7 +59,16 @@ export function Dashboard() {
 
   const { start, end, days } = resolveRange(preset);
 
+  // Preselect the default website once the list arrives, before the first fetch.
   useEffect(() => {
+    if (websitesLoading || defaultApplied) return;
+    const defaultSite = websites.find((w) => w.domain === DEFAULT_WEBSITE_DOMAIN);
+    if (defaultSite) setWebsiteId(defaultSite.id);
+    setDefaultApplied(true);
+  }, [websites, websitesLoading, defaultApplied]);
+
+  useEffect(() => {
+    if (!defaultApplied) return;
     const prevRange = previousRange(start, days);
     const filters = {
       start,
@@ -81,7 +93,7 @@ export function Dashboard() {
         setWebsiteRows(byWebsite);
       })
       .finally(() => setLoading(false));
-  }, [start, end, days, websiteId, repId]);
+  }, [start, end, days, websiteId, repId, defaultApplied]);
 
   function exportCsv() {
     const url = dashboardApi.exportUrl({

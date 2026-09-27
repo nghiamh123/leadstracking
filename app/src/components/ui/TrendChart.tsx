@@ -62,7 +62,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
         />
         <Line
           yAxisId="clicks"
-          type="monotone"
+          type="linear"
           dataKey="clicks"
           name="Traffic (click)"
           stroke="#111111"
@@ -71,7 +71,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
         />
         <Line
           yAxisId="count"
-          type="monotone"
+          type="linear"
           dataKey="leads"
           name="Lead"
           stroke="#1F6C9F"
@@ -80,7 +80,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
         />
         <Line
           yAxisId="count"
-          type="monotone"
+          type="linear"
           dataKey="orders"
           name="Đơn hàng"
           stroke="#346538"

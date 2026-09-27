@@ -189,7 +189,7 @@ export interface WebsiteTrendPoint {
   [websiteId: string]: string | number;
 }
 export interface WebsiteTrendResponse {
-  websites: { id: string; name: string }[];
+  websites: { id: string; name: string; domain: string }[];
   data: WebsiteTrendPoint[];
 }
 

@@ -26,22 +26,28 @@ const COLORS = [
   "#9333EA",
 ];
 
+// Website shown by default; the others start hidden until toggled on.
+const DEFAULT_DOMAIN = "quatangsg.vn";
+
 export function WebsiteTrendChart({
   websites,
   data,
 }: {
-  websites: { id: string; name: string }[];
+  websites: { id: string; name: string; domain: string }[];
   data: WebsiteTrendPoint[];
 }) {
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // null = user hasn't toggled anything yet, so fall back to the default website.
+  const [visible, setVisible] = useState<Set<string> | null>(null);
+
+  const defaultVisible = websites.filter((w) => w.domain === DEFAULT_DOMAIN).map((w) => w.id);
+  const shown = visible ?? new Set(defaultVisible.length ? defaultVisible : websites.map((w) => w.id));
+  const hidden = new Set(websites.filter((w) => !shown.has(w.id)).map((w) => w.id));
 
   function toggle(id: string) {
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const next = new Set(shown);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setVisible(next);
   }
 
   return (
@@ -99,7 +105,7 @@ export function WebsiteTrendChart({
               return (
                 <Line
                   key={w.id}
-                  type="monotone"
+                  type="linear"
                   dataKey={w.id}
                   name={w.name}
                   stroke={COLORS[colorIndex % COLORS.length]}
