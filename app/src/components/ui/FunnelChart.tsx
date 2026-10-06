@@ -9,7 +9,7 @@ interface FunnelStage {
 
 const toneBar: Record<FunnelStage["tone"], string> = {
   ink: "bg-ink",
-  blue: "bg-pale-blue-ink",
+  blue: "bg-brand",
   green: "bg-pale-green-ink",
 };
 

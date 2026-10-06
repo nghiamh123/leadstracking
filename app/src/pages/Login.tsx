@@ -30,19 +30,21 @@ export function Login() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas px-4">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-pale-yellow opacity-[0.15] blur-3xl"
+        className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-brand opacity-[0.12] blur-3xl"
       />
 
       <div className="fade-up relative w-full max-w-sm rounded-xl border border-border bg-surface p-8">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-ink font-serif text-lg text-white">
-            F
-          </div>
+          <img
+            src="/brand/logo-inogift.png"
+            alt="Inogift Sài Gòn"
+            className="mx-auto mb-4 h-20 w-auto"
+          />
           <h1 className="font-serif text-2xl tracking-tight text-ink">
             Phễu Chuyển Đổi
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Tiến Thành Group — nội bộ, đo lường Traffic → Lead → Đơn hàng
+            Inogift Sài Gòn — nội bộ, đo lường Traffic → Lead → Đơn hàng
           </p>
         </div>
 
@@ -54,7 +56,7 @@ export function Login() {
             <input
               type="email"
               required
-              placeholder="ten@tienthanhgroup.vn"
+              placeholder="ten@inogiftsaigon.vn"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-ink"
@@ -92,9 +94,17 @@ export function Login() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-muted">
-          Chỉ dành cho nhân viên Tiến Thành Group. Liên hệ IT nếu bạn chưa có
-          tài khoản.
+          Chỉ dành cho nhân viên Inogift Sài Gòn. Liên hệ quản trị viên nếu bạn
+          chưa có tài khoản.
         </p>
+        <div className="mt-4 flex items-center justify-center gap-2 border-t border-border pt-4 text-[11px] text-muted">
+          <span>Phát triển bởi</span>
+          <img
+            src="/brand/logo-owner.png"
+            alt="Đơn vị phát triển"
+            className="h-6 w-auto"
+          />
+        </div>
       </div>
     </div>
   );

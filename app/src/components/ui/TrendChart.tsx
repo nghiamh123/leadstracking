@@ -21,18 +21,18 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={280}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="#EAEAEA" vertical={false} />
+        <CartesianGrid stroke="#E3E6EF" vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={formatDateShort}
-          tick={{ fontSize: 11, fill: "#787774" }}
-          axisLine={{ stroke: "#EAEAEA" }}
+          tick={{ fontSize: 11, fill: "#6B7390" }}
+          axisLine={{ stroke: "#E3E6EF" }}
           tickLine={false}
           minTickGap={24}
         />
         <YAxis
           yAxisId="clicks"
-          tick={{ fontSize: 11, fill: "#787774" }}
+          tick={{ fontSize: 11, fill: "#6B7390" }}
           axisLine={false}
           tickLine={false}
           width={44}
@@ -41,14 +41,14 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
         <YAxis
           yAxisId="count"
           orientation="right"
-          tick={{ fontSize: 11, fill: "#787774" }}
+          tick={{ fontSize: 11, fill: "#6B7390" }}
           axisLine={false}
           tickLine={false}
           width={36}
         />
         <Tooltip
           contentStyle={{
-            border: "1px solid #EAEAEA",
+            border: "1px solid #E3E6EF",
             borderRadius: 8,
             fontSize: 12,
             boxShadow: "none",
@@ -65,7 +65,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           type="linear"
           dataKey="clicks"
           name="Traffic (click)"
-          stroke="#111111"
+          stroke="#1B2858"
           strokeWidth={2}
           dot={false}
         />
@@ -74,7 +74,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
           type="linear"
           dataKey="leads"
           name="Lead"
-          stroke="#1F6C9F"
+          stroke="#EB7A28"
           strokeWidth={2}
           dot={false}
         />

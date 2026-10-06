@@ -217,7 +217,7 @@ export function AdminUsers() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="ten@tienthanhgroup.vn"
+                placeholder="ten@inogiftsaigon.vn"
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
               />
             </label>

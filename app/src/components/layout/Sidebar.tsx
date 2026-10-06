@@ -71,15 +71,17 @@ export function SidebarContent({
   const showAdmin = adminNav.some((i) => i.roles.includes(role));
   return (
     <div className="flex h-full flex-col gap-6 p-4">
-      <div className="flex items-center gap-2 px-2 pt-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-sm font-serif text-white">
-          F
-        </div>
-        <div>
-          <p className="font-serif text-base leading-none text-ink">
+      <div className="flex items-center gap-3 px-2 pt-2">
+        <img
+          src="/brand/logo-inogift.png"
+          alt="Inogift Sài Gòn"
+          className="h-12 w-auto shrink-0"
+        />
+        <div className="border-l border-border pl-3">
+          <p className="font-serif text-base leading-tight text-ink">
             Phễu Chuyển Đổi
           </p>
-          <p className="text-[11px] text-muted">Tiến Thành Group</p>
+          <p className="text-[11px] text-muted">Inogift Sài Gòn</p>
         </div>
       </div>
 
@@ -98,9 +100,19 @@ export function SidebarContent({
         </div>
       )}
 
-      <div className="mt-auto flex items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2 text-xs text-muted">
-        <GearSix size={14} />
-        Đồng bộ GSC lúc 02:00 hằng ngày
+      <div className="mt-auto flex flex-col gap-3">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2 text-xs text-muted">
+          <GearSix size={14} />
+          Đồng bộ GSC lúc 02:00 hằng ngày
+        </div>
+        <div className="flex items-center gap-2 px-1 text-[11px] text-muted">
+          <span>Phát triển bởi</span>
+          <img
+            src="/brand/logo-owner.png"
+            alt="Đơn vị phát triển"
+            className="h-5 w-auto"
+          />
+        </div>
       </div>
     </div>
   );

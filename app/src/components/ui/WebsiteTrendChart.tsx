@@ -12,8 +12,8 @@ import { formatDateShort, formatNumber } from "../../lib/format";
 import type { WebsiteTrendPoint } from "../../lib/api";
 
 const COLORS = [
-  "#111111",
-  "#1F6C9F",
+  "#1B2858",
+  "#EB7A28",
   "#346538",
   "#B45309",
   "#7C3AED",
@@ -61,7 +61,7 @@ export function WebsiteTrendChart({
               key={w.id}
               onClick={() => toggle(w.id)}
               className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-opacity"
-              style={{ borderColor: isHidden ? "#EAEAEA" : color, opacity: isHidden ? 0.4 : 1 }}
+              style={{ borderColor: isHidden ? "#E3E6EF" : color, opacity: isHidden ? 0.4 : 1 }}
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
               {w.name}
@@ -72,17 +72,17 @@ export function WebsiteTrendChart({
 
       <ResponsiveContainer width="100%" height={360}>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke="#EAEAEA" vertical={false} />
+          <CartesianGrid stroke="#E3E6EF" vertical={false} />
           <XAxis
             dataKey="date"
             tickFormatter={formatDateShort}
-            tick={{ fontSize: 11, fill: "#787774" }}
-            axisLine={{ stroke: "#EAEAEA" }}
+            tick={{ fontSize: 11, fill: "#6B7390" }}
+            axisLine={{ stroke: "#E3E6EF" }}
             tickLine={false}
             minTickGap={24}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: "#787774" }}
+            tick={{ fontSize: 11, fill: "#6B7390" }}
             axisLine={false}
             tickLine={false}
             width={44}
@@ -90,7 +90,7 @@ export function WebsiteTrendChart({
           />
           <Tooltip
             contentStyle={{
-              border: "1px solid #EAEAEA",
+              border: "1px solid #E3E6EF",
               borderRadius: 8,
               fontSize: 12,
               boxShadow: "none",

@@ -7,14 +7,19 @@
     Arial, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
 
-  --color-canvas: #fbfbfa;
+  --color-canvas: #f8f9fc;
   --color-surface: #ffffff;
-  --color-surface-alt: #f7f6f3;
-  --color-border: #eaeaea;
+  --color-surface-alt: #f2f4f9;
+  --color-border: #e3e6ef;
 
-  --color-ink: #111111;
-  --color-ink-soft: #2f3437;
-  --color-muted: #787774;
+  /* Inogift Sài Gòn: navy chủ đạo (chữ, nút, mục đang chọn) + cam nhấn */
+  --color-ink: #1b2858;
+  --color-ink-soft: #2e3a5f;
+  --color-muted: #6b7390;
+
+  --color-brand: #eb7a28;
+  --color-brand-soft: #fdf0e4;
+  --color-brand-ink: #b3540f;
 
   --color-pale-red: #fdebec;
   --color-pale-red-ink: #9f2f2d;
@@ -50,13 +55,13 @@ body {
 }
 
 ::selection {
-  background: var(--color-pale-yellow);
+  background: var(--color-brand-soft);
   color: var(--color-ink);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d8d6d1 transparent;
+  scrollbar-color: #cfd4e3 transparent;
 }
 
 @keyframes fade-up {
