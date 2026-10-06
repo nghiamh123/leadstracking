@@ -12,17 +12,20 @@
 if (!defined('ABSPATH')) exit;
 
 function lt_report_login($username, $success) {
-    if (!defined('LT_LOGIN_ENDPOINT') || !defined('LT_LOGIN_API_KEY')) return;
+    if (!defined('LT_LOGIN_ENDPOINT') || !defined('LT_LOGIN_API_KEY')) {
+        error_log('[LeadsTracking] thiếu LT_LOGIN_ENDPOINT / LT_LOGIN_API_KEY trong wp-config.php');
+        return;
+    }
 
     $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP']
         : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
 
-    // blocking=false: không làm chậm đăng nhập, cũng không lỗi nếu LeadsTracking đang tắt.
-    wp_remote_post(LT_LOGIN_ENDPOINT, array(
-        'timeout'  => 3,
-        'blocking' => false,
-        'headers'  => array('Content-Type' => 'application/json', 'x-api-key' => LT_LOGIN_API_KEY),
-        'body'     => wp_json_encode(array(
+    // Gọi có chờ (tối đa 3s): kiểu không chờ hay bị cắt trước khi bắt tay TLS xong nên request không được gửi.
+    // Lỗi chỉ ghi vào error log, không bao giờ làm hỏng việc đăng nhập.
+    $res = wp_remote_post(LT_LOGIN_ENDPOINT, array(
+        'timeout' => 3,
+        'headers' => array('Content-Type' => 'application/json', 'x-api-key' => LT_LOGIN_API_KEY),
+        'body'    => wp_json_encode(array(
             'domain'     => wp_parse_url(home_url(), PHP_URL_HOST),
             'username'   => (string) $username,
             'success'    => (bool) $success,
@@ -31,6 +34,11 @@ function lt_report_login($username, $success) {
             'occurredAt' => gmdate('c'),
         )),
     ));
+    if (is_wp_error($res)) {
+        error_log('[LeadsTracking] gửi thất bại: ' . $res->get_error_message());
+    } elseif (wp_remote_retrieve_response_code($res) >= 300) {
+        error_log('[LeadsTracking] server trả ' . wp_remote_retrieve_response_code($res) . ': ' . wp_remote_retrieve_body($res));
+    }
 }
 
 add_action('wp_login', function ($user_login) { lt_report_login($user_login, true); }, 10, 1);
