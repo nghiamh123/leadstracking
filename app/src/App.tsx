@@ -10,6 +10,7 @@ import { AdminWebsites } from "./pages/admin/Websites";
 import { AdminHostings } from "./pages/admin/Hostings";
 import { AdminUsers } from "./pages/admin/Users";
 import { AdminSyncLogs } from "./pages/admin/SyncLogs";
+import { AdminLoginLogs } from "./pages/admin/LoginLogs";
 import { useSession } from "./lib/session";
 
 function ProtectedLayout() {
@@ -38,6 +39,7 @@ function App() {
         <Route path="/admin/websites" element={<AdminWebsites />} />
         <Route path="/admin/hostings" element={<AdminHostings />} />
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/login-logs" element={<AdminLoginLogs />} />
         <Route path="/admin/sync-logs" element={<AdminSyncLogs />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

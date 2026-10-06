@@ -18,6 +18,7 @@ export const adminNav: NavItem[] = [
   { to: "/admin/websites", label: "Website", roles: ["admin"] },
   { to: "/admin/hostings", label: "Hosting", roles: ["admin"] },
   { to: "/admin/users", label: "Người dùng", roles: ["admin"] },
+  { to: "/admin/login-logs", label: "Lịch sử đăng nhập", roles: ["admin"] },
   { to: "/admin/sync-logs", label: "Nhật ký đồng bộ", roles: ["admin"] },
 ];
 

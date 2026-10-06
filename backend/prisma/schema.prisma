@@ -99,6 +99,7 @@ model User {
   assistantConversations AssistantConversation[]
   leadActivities         LeadActivity[]
   reminders              Reminder[]
+  loginEvents            LoginEvent[]
 
   @@map("users")
 }
@@ -122,6 +123,7 @@ model Website {
   orders       Order[]
   syncLogs     SyncLog[]
   hostings     HostingAccount[]
+  loginEvents  LoginEvent[]
 
   @@map("websites")
 }
@@ -342,4 +344,26 @@ model HostingAccount {
 
   @@index([websiteId])
   @@map("hosting_accounts")
+}
+
+// Lượt đăng nhập vào trang admin của từng website (do website tự báo về qua POST /login-events).
+model LoginEvent {
+  id         String   @id @default(cuid())
+  websiteId  String   @map("website_id")
+  username   String
+  // Map sang người dùng LeadsTracking nếu username/email trùng; null nếu không khớp.
+  userId     String?  @map("user_id")
+  success    Boolean
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  occurredAt DateTime @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId, occurredAt])
+  @@index([username, occurredAt])
+  @@index([occurredAt])
+  @@map("login_events")
 }

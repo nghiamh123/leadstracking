@@ -357,6 +357,49 @@ export const syncLogsApi = {
     apiFetch<unknown>("/sync-logs/sync", { method: "POST", body: JSON.stringify({ websiteId }) }),
 };
 
+// ---- Lịch sử đăng nhập admin các website ----
+export interface LoginEventEntry {
+  id: string;
+  websiteId: string;
+  username: string;
+  success: boolean;
+  ip: string | null;
+  userAgent: string | null;
+  occurredAt: string;
+  user: { name: string } | null;
+}
+
+export interface LoginEventsPage {
+  data: LoginEventEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface LoginEventsSummary {
+  successToday: number;
+  failedToday: number;
+  activeUsersToday: number;
+  suspicious: { websiteId: string; username: string; failedCount: number }[];
+}
+
+export const loginEventsApi = {
+  list: (params: {
+    websiteId?: string;
+    username?: string;
+    success?: string;
+    from?: string;
+    to?: string;
+    page: number;
+    pageSize: number;
+  }) =>
+    apiFetch<LoginEventsPage>(
+      `/login-events${qs({ ...params, page: String(params.page), pageSize: String(params.pageSize) })}`,
+    ),
+  summary: () => apiFetch<LoginEventsSummary>("/login-events/summary"),
+};
+
 // ---- Chăm sóc khách (lần liên hệ + lịch nhắc) ----
 export type LeadActivityType = "call" | "message" | "meeting" | "email" | "other";
 
