@@ -6,6 +6,7 @@ import { Keywords } from "./pages/Keywords";
 import { Leads } from "./pages/Leads";
 import { Orders } from "./pages/Orders";
 import { Assistant } from "./pages/Assistant";
+import { Tickets } from "./pages/Tickets";
 import { AdminWebsites } from "./pages/admin/Websites";
 import { AdminHostings } from "./pages/admin/Hostings";
 import { AdminUsers } from "./pages/admin/Users";
@@ -35,6 +36,7 @@ function App() {
         <Route path="/keywords" element={<Keywords />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/tickets" element={<Tickets />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/admin/websites" element={<AdminWebsites />} />
         <Route path="/admin/hostings" element={<AdminHostings />} />

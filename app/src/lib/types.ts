@@ -91,3 +91,7 @@ export interface AuditLogEntry {
   changedAt: string;
   changedBy: { name: string };
 }
+
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+export type TicketCategory = "bug" | "display" | "data" | "performance" | "request" | "other";

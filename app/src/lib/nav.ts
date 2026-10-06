@@ -11,6 +11,7 @@ export const mainNav: NavItem[] = [
   { to: "/keywords", label: "Từ khóa", roles: ["admin", "manager", "seo"] },
   { to: "/leads", label: "Lead", roles: ["admin", "manager", "sales"] },
   { to: "/orders", label: "Đơn hàng", roles: ["admin", "manager", "sales"] },
+  { to: "/tickets", label: "Ticket", roles: ["admin", "manager", "sales", "seo"] },
   { to: "/assistant", label: "Trợ lý AI", roles: ["admin", "manager", "sales", "seo"] },
 ];
 
