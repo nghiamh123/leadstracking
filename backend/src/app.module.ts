@@ -15,6 +15,7 @@ import { AssistantModule } from './assistant/assistant.module.js';
 import { FollowupsModule } from './followups/followups.module.js';
 import { HostingsModule } from './hostings/hostings.module.js';
 import { LoginEventsModule } from './login-events/login-events.module.js';
+import { TicketsModule } from './tickets/tickets.module.js';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { LoginEventsModule } from './login-events/login-events.module.js';
     FollowupsModule,
     HostingsModule,
     LoginEventsModule,
+    TicketsModule,
     AssistantModule,
   ],
 })

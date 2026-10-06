@@ -11,6 +11,9 @@ import type {
   SyncLogEntry,
   Website,
   HostingAccount,
+  TicketCategory,
+  TicketPriority,
+  TicketStatus,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
@@ -436,6 +439,117 @@ export const followupsApi = {
   setDone: (id: string, done: boolean) =>
     apiFetch<Reminder>(`/reminders/${id}`, { method: "PATCH", body: JSON.stringify({ done }) }),
   removeReminder: (id: string) => apiFetch<{ ok: true }>(`/reminders/${id}`, { method: "DELETE" }),
+};
+
+// ---- Ticket báo lỗi cho dev ----
+export interface TicketUser {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface TicketImage {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  department: Role;
+  websiteId: string | null;
+  pageUrl: string | null;
+  resolvedAt: string | null;
+  /** Có giá trị khi ảnh đính kèm đã bị cron xoá (3 ngày sau khi ticket hoàn thành). */
+  imagesPurgedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  website: { id: string; name: string } | null;
+  createdBy: TicketUser;
+  assignee: TicketUser | null;
+  _count: { comments: number; images: number };
+}
+
+export interface TicketComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  user: TicketUser;
+}
+
+export interface TicketDetail extends Ticket {
+  comments: TicketComment[];
+  images: TicketImage[];
+}
+
+export interface TicketsPage {
+  data: Ticket[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  /** Số ticket theo trạng thái, trên tập đã lọc nhưng không tính bộ lọc trạng thái. */
+  statusCounts: Record<TicketStatus, number>;
+}
+
+export interface TicketInput {
+  title: string;
+  description: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  websiteId?: string;
+  pageUrl?: string;
+}
+
+export const ticketsApi = {
+  list: (params: {
+    status?: TicketStatus;
+    priority?: TicketPriority;
+    category?: TicketCategory;
+    department?: Role;
+    search?: string;
+    page: number;
+    pageSize: number;
+  }) =>
+    apiFetch<TicketsPage>(
+      `/tickets${qs({ ...params, page: String(params.page), pageSize: String(params.pageSize) })}`,
+    ),
+  get: (id: string) => apiFetch<TicketDetail>(`/tickets/${id}`),
+  create: (data: TicketInput) =>
+    apiFetch<Ticket>("/tickets", { method: "POST", body: JSON.stringify(data) }),
+  /** assigneeId: chuỗi rỗng = bỏ gán (chỉ admin). */
+  update: (
+    id: string,
+    data: Partial<TicketInput> & { status?: TicketStatus; assigneeId?: string },
+  ) => apiFetch<Ticket>(`/tickets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  comment: (id: string, body: string) =>
+    apiFetch<TicketComment>(`/tickets/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+  remove: (id: string) => apiFetch<{ ok: true }>(`/tickets/${id}`, { method: "DELETE" }),
+  /** Mỗi request 1 ảnh (đã nén) để không vượt giới hạn body 1MB của nginx. */
+  uploadImage: (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch<TicketImage>(`/tickets/${id}/images`, { method: "POST", body: form });
+  },
+  removeImage: (id: string, imageId: string) =>
+    apiFetch<{ ok: true }>(`/tickets/${id}/images/${imageId}`, { method: "DELETE" }),
+  /** Ảnh cần cookie đăng nhập nên tải bằng fetch rồi dựng blob URL, không dùng thẳng <img src>. */
+  imageBlob: async (id: string, imageId: string): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/tickets/${id}/images/${imageId}`, {
+      credentials: "include",
+      headers: { "ngrok-skip-browser-warning": "true" },
+    });
+    if (!res.ok) throw await toApiError(res);
+    return res.blob();
+  },
 };
 
 // ---- Trợ lý AI ----
