@@ -18,6 +18,8 @@ $ctl  = $root . '/app/Http/Controllers/Auth/LoginController.php';
 $svc  = $root . '/config/services.php';
 $sup  = $root . '/app/Support/LeadsTracking.php';
 $env  = $root . '/.env';
+$req  = $root . '/app/Http/Requests/Login/LoginRequest.php';
+$REQ_RE = '/class\s+LoginRequest\s+extends\s+FormRequest\s*\{/';
 foreach ([$root . '/artisan', $ctl, $svc, $env] as $f) {
     if (!file_exists($f)) { fwrite(STDERR, "Không thấy $f - hãy chạy script ở thư mục gốc website.\n"); exit(1); }
 }
@@ -52,6 +54,17 @@ $svcDone = strpos($s, "'leadstracking'") !== false;
 if (!$svcDone && !preg_match('/\n\];\s*$/', $s)) {
     fwrite(STDERR, "DỪNG: config/services.php không có dạng mong đợi. Chưa sửa gì.\n");
     exit(2);
+}
+
+// LoginRequest: form bị chặn ở bước kiểm tra (captcha/mã khóa) chưa vào được LoginController, cần báo thất bại ở đây.
+$reqExists = file_exists($req);
+$r = $reqExists ? file_get_contents($req) : '';
+$reqDone = !$reqExists || strpos($r, 'reportLogin') !== false;
+if ($reqExists && !$reqDone) {
+    if (preg_match_all($REQ_RE, $r) !== 1 || strpos($r, 'failedValidation') !== false) {
+        fwrite(STDERR, "DỪNG: LoginRequest.php không khớp mẫu (đã có failedValidation hoặc không thấy khai báo class). Chưa sửa gì. Gửi file này cho người hỗ trợ.\n");
+        exit(2);
+    }
 }
 
 // ---- 2. Ghi ----
@@ -141,6 +154,16 @@ if (!$svcDone) {
     echo "OK config/services.php (bản gốc: services.php.bak-lt)\n";
 } else { echo "BỎ QUA config/services.php (đã cài)\n"; }
 
+if (!$reqExists) {
+    echo "BỎ QUA LoginRequest.php (không có file này)\n";
+} elseif (!$reqDone) {
+    copy($req, $req . '.bak-lt');
+    $method = "\n    /**\n     * Form bị chặn ở bước kiểm tra (sai captcha / mã khóa / thiếu trường) thì chưa vào được LoginController,\n     * nên báo thất bại về LeadsTracking tại đây để vẫn thấy được các lượt dò đăng nhập của bot.\n     */\n    protected function failedValidation(\\Illuminate\\Contracts\\Validation\\Validator \$validator)\n    {\n        \\App\\Support\\LeadsTracking::reportLogin(\$this->input('txtEmail') ?: 'unknown', false);\n        parent::failedValidation(\$validator);\n    }\n";
+    $r = preg_replace($REQ_RE, '$0' . addcslashes($method, '\\$'), $r, 1);
+    file_put_contents($req, $r);
+    echo "OK LoginRequest.php (bản gốc: LoginRequest.php.bak-lt)\n";
+} else { echo "BỎ QUA LoginRequest.php (đã cài)\n"; }
+
 $e = file_get_contents($env);
 if (strpos($e, 'LT_LOGIN_ENDPOINT') === false) {
     file_put_contents($env, rtrim($e, "\n") . "\n\nLT_LOGIN_ENDPOINT=$ENDPOINT\nLT_LOGIN_API_KEY=$key\n");
@@ -148,7 +171,7 @@ if (strpos($e, 'LT_LOGIN_ENDPOINT') === false) {
 } else { echo "BỎ QUA .env (đã có LT_LOGIN_ENDPOINT; kiểm tra lại giá trị bằng tay nếu cần)\n"; }
 
 // ---- 3. Kiểm tra cú pháp + xoá cache config ----
-foreach ([$sup, $ctl, $svc] as $f) {
+foreach (array_filter([$sup, $ctl, $svc, $reqExists ? $req : null]) as $f) {
     $out = []; exec('php -l ' . escapeshellarg($f) . ' 2>&1', $out, $rc);
     if ($rc !== 0) { fwrite(STDERR, "LỖI cú pháp ở $f: " . implode(' ', $out) . "\nKhôi phục từ file .bak-lt rồi báo lại.\n"); exit(3); }
 }
