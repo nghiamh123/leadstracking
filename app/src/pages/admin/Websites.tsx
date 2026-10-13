@@ -4,7 +4,8 @@ import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../../components/ui/Pagination";
 import { useWebsites } from "../../lib/hooks";
-import { websitesApi, ApiError } from "../../lib/api";
+import { websitesApi, loginEventsApi, ApiError } from "../../lib/api";
+import type { LoginTrackingStatus } from "../../lib/api";
 import type { Website } from "../../lib/types";
 
 const statusTone: Record<Website["status"], "green" | "red" | "yellow"> = {
@@ -42,6 +43,14 @@ function isoDaysAgo(n: number): string {
 
 export function AdminWebsites() {
   const { websites, loading, reload } = useWebsites();
+  // Website nào đã báo lượt đăng nhập admin về LeadsTracking (= đã cài tracking) và lần gần nhất.
+  const [loginStatus, setLoginStatus] = useState<Record<string, LoginTrackingStatus>>({});
+  useEffect(() => {
+    loginEventsApi
+      .statusByWebsite()
+      .then((rows) => setLoginStatus(Object.fromEntries(rows.map((r) => [r.websiteId, r]))))
+      .catch(() => undefined);
+  }, []);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Website | null>(null);
   const [form, setForm] = useState<WebsiteForm>(emptyForm);
@@ -243,12 +252,13 @@ export function AdminWebsites() {
 
       <div className="fade-up overflow-hidden rounded-xl border border-border bg-surface">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted">
                 <th className="px-6 py-3 font-medium">Tên website</th>
                 <th className="px-6 py-3 font-medium">Domain</th>
                 <th className="px-6 py-3 font-medium">Trạng thái</th>
+                <th className="px-6 py-3 font-medium">Theo dõi đăng nhập</th>
                 <th className="px-6 py-3 font-medium" />
               </tr>
             </thead>
@@ -260,6 +270,21 @@ export function AdminWebsites() {
                     <td className="px-6 py-3 text-muted">{w.domain}</td>
                     <td className="px-6 py-3">
                       <Badge tone={statusTone[w.status]}>{statusLabel[w.status]}</Badge>
+                    </td>
+                    <td className="px-6 py-3">
+                      {loginStatus[w.id]?.lastEventAt ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge tone="green">Đã kết nối</Badge>
+                          <span className="text-xs text-muted">
+                            Gần nhất:{" "}
+                            {new Date(loginStatus[w.id].lastEventAt!).toLocaleString("vi-VN", {
+                              timeZone: "Asia/Ho_Chi_Minh",
+                            })}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge tone="neutral">Chưa kết nối</Badge>
+                      )}
                     </td>
                     <td className="px-6 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
@@ -292,7 +317,7 @@ export function AdminWebsites() {
                 ))}
               {loading && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-muted">
+                  <td colSpan={5} className="px-6 py-10 text-center text-muted">
                     Đang tải...
                   </td>
                 </tr>

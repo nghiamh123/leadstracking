@@ -116,6 +116,20 @@ export class LoginEventsService {
     };
   }
 
+  /** Mỗi website đã báo lượt đăng nhập nào về chưa + lần gần nhất: dùng để hiện trạng thái "đã kết nối" ở trang Website. */
+  async statusByWebsite() {
+    const rows = await this.prisma.loginEvent.groupBy({
+      by: ['websiteId'],
+      _max: { occurredAt: true },
+      _count: { _all: true },
+    });
+    return rows.map((r) => ({
+      websiteId: r.websiteId,
+      lastEventAt: r._max.occurredAt,
+      eventCount: r._count._all,
+    }));
+  }
+
   /** Dọn log cũ hơn 90 ngày, chạy 03:00 hằng ngày. */
   @Cron('0 3 * * *')
   async purgeOld() {

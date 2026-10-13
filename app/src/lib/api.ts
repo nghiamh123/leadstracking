@@ -387,7 +387,14 @@ export interface LoginEventsSummary {
   suspicious: { websiteId: string; username: string; failedCount: number }[];
 }
 
+export interface LoginTrackingStatus {
+  websiteId: string;
+  lastEventAt: string | null;
+  eventCount: number;
+}
+
 export const loginEventsApi = {
+  statusByWebsite: () => apiFetch<LoginTrackingStatus[]>("/login-events/status-by-website"),
   list: (params: {
     websiteId?: string;
     username?: string;

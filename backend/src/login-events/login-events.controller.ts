@@ -47,4 +47,11 @@ export class LoginEventsController {
   summary() {
     return this.service.summary();
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.admin)
+  @Get('status-by-website')
+  statusByWebsite() {
+    return this.service.statusByWebsite();
+  }
 }
