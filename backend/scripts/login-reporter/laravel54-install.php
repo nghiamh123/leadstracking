@@ -26,15 +26,25 @@ foreach ([$root . '/artisan', $ctl, $svc, $env] as $f) {
 $USE  = 'use App\Models\LogLogin;';
 $SAVE = '$log_login->save();';
 $INC  = '$this->incrementLoginAttempts($request);';
+$ELSE_RE = '/(\}\s*else\s*\{[ \t]*\r?\n)([ \t]*)(Auth::guard\(\'web\'\)->logout\(\);)/';
 
 $c = file_get_contents($ctl);
 $ctlDone = strpos($c, 'LeadsTracking::reportLogin') !== false;
 if (!$ctlDone) {
-    foreach ([$USE, $SAVE, $INC] as $needle) {
+    foreach ([$USE, $SAVE] as $needle) {
         if (substr_count($c, $needle) !== 1) {
             fwrite(STDERR, "DỪNG: LoginController không khớp mẫu (cần đúng 1 dòng: $needle). Chưa sửa gì. Gửi file này cho người hỗ trợ.\n");
             exit(2);
         }
+    }
+    // Chỗ gắn báo "đăng nhập thất bại": bản có giới hạn số lần sai (incrementLoginAttempts) hoặc bản cũ "} else { logout".
+    if (substr_count($c, $INC) === 1) {
+        $failMode = 'inc';
+    } elseif (preg_match_all($ELSE_RE, $c) === 1) {
+        $failMode = 'else';
+    } else {
+        fwrite(STDERR, "DỪNG: không tìm thấy đúng 1 chỗ gắn báo đăng nhập thất bại trong LoginController. Chưa sửa gì. Gửi file này cho người hỗ trợ.\n");
+        exit(2);
     }
 }
 $s = file_get_contents($svc);
@@ -114,7 +124,11 @@ if (!$ctlDone) {
     copy($ctl, $ctl . '.bak-lt');
     $c = str_replace($USE, $USE . "\nuse App\\Support\\LeadsTracking;", $c);
     $c = str_replace($SAVE, $SAVE . "\n            LeadsTracking::reportLogin(Auth::user()->email, true);", $c);
-    $c = str_replace($INC, $INC . "\n            LeadsTracking::reportLogin(\$request->txtEmail, false);", $c);
+    if ($failMode === 'inc') {
+        $c = str_replace($INC, $INC . "\n            LeadsTracking::reportLogin(\$request->txtEmail, false);", $c);
+    } else {
+        $c = preg_replace($ELSE_RE, '${1}${2}LeadsTracking::reportLogin($request->txtEmail, false);' . "\n" . '${2}${3}', $c);
+    }
     file_put_contents($ctl, $c);
     echo "OK LoginController.php (bản gốc: LoginController.php.bak-lt)\n";
 } else { echo "BỎ QUA LoginController.php (đã cài)\n"; }
