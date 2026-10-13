@@ -20,6 +20,7 @@ export function AdminLoginLogs() {
   const [loading, setLoading] = useState(true);
   const [filterWebsite, setFilterWebsite] = useState("all");
   const [filterResult, setFilterResult] = useState("all");
+  const [filterArea, setFilterArea] = useState("all");
   const [username, setUsername] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -29,7 +30,7 @@ export function AdminLoginLogs() {
   // Đổi bộ lọc/số dòng mỗi trang thì quay lại trang 1.
   useEffect(() => {
     setPage(1);
-  }, [filterWebsite, filterResult, username, from, to, pageSize]);
+  }, [filterWebsite, filterResult, filterArea, username, from, to, pageSize]);
 
   useEffect(() => {
     loginEventsApi.summary().then(setSummary);
@@ -43,6 +44,7 @@ export function AdminLoginLogs() {
         .list({
           websiteId: filterWebsite === "all" ? undefined : filterWebsite,
           success: filterResult === "all" ? undefined : filterResult,
+          area: filterArea === "all" ? undefined : filterArea,
           username: username || undefined,
           from: from || undefined,
           to: to || undefined,
@@ -57,7 +59,7 @@ export function AdminLoginLogs() {
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(t);
-  }, [filterWebsite, filterResult, username, from, to, page, pageSize]);
+  }, [filterWebsite, filterResult, filterArea, username, from, to, page, pageSize]);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -110,6 +112,16 @@ export function AdminLoginLogs() {
           <option value="true">Thành công</option>
           <option value="false">Thất bại</option>
         </Select>
+        <Select
+          label="Khu vực"
+          value={filterArea}
+          onChange={(e) => setFilterArea(e.target.value)}
+          className="w-full sm:w-40"
+        >
+          <option value="all">Tất cả</option>
+          <option value="vn">Việt Nam</option>
+          <option value="foreign">Nước ngoài</option>
+        </Select>
         <label className="flex w-full flex-col gap-1 text-xs font-medium text-muted sm:w-48">
           Người dùng
           <input
@@ -131,7 +143,7 @@ export function AdminLoginLogs() {
 
       <div className="fade-up overflow-hidden rounded-xl border border-border bg-surface">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[920px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted">
                 <th className="px-6 py-3 font-medium">Thời điểm</th>
@@ -139,6 +151,7 @@ export function AdminLoginLogs() {
                 <th className="px-6 py-3 font-medium">Người dùng</th>
                 <th className="px-6 py-3 font-medium">Kết quả</th>
                 <th className="px-6 py-3 font-medium">IP</th>
+                <th className="px-6 py-3 font-medium">Khu vực (theo IP)</th>
               </tr>
             </thead>
             <tbody>
@@ -159,18 +172,21 @@ export function AdminLoginLogs() {
                     <td className="px-6 py-3 tabular-nums text-muted" title={e.userAgent ?? undefined}>
                       {e.ip ?? "—"}
                     </td>
+                    <td className="px-6 py-3">
+                      <Location e={e} />
+                    </td>
                   </tr>
                 ))}
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-muted">
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted">
                     Đang tải...
                   </td>
                 </tr>
               )}
               {!loading && events.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-muted">
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted">
                     Chưa có lượt đăng nhập phù hợp bộ lọc.
                   </td>
                 </tr>
@@ -200,6 +216,40 @@ function Stat({ label, value, warn }: { label: string; value: number; warn?: boo
     <div className="rounded-xl border border-border bg-surface p-4">
       <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${warn ? "text-pale-red-ink" : "text-ink"}`}>{value}</p>
+    </div>
+  );
+}
+
+function Location({ e }: { e: LoginEventEntry }) {
+  if (!e.ip) return <span className="text-muted">—</span>;
+  if (!e.geoCheckedAt) return <span className="text-xs text-muted">Đang tra cứu...</span>;
+  if (!e.countryCode) return <span className="text-xs text-muted">Mạng nội bộ / không xác định</span>;
+
+  // Thành phố trùng tên tỉnh (vd. TP.HCM) thì chỉ ghi 1 lần.
+  const place = [e.city, e.region !== e.city ? e.region : null, e.country].filter(Boolean).join(", ");
+  const foreign = e.countryCode !== "VN";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2 text-ink-soft">
+        <span>{place}</span>
+        {foreign && <Badge tone="red">Nước ngoài</Badge>}
+      </div>
+      <span className="text-xs text-muted">
+        {[e.isp, e.asn].filter(Boolean).join(" · ")}
+        {e.latitude != null && e.longitude != null && (
+          <>
+            {" · "}
+            <a
+              className="underline hover:text-ink"
+              href={`https://www.openstreetmap.org/?mlat=${e.latitude}&mlon=${e.longitude}#map=10/${e.latitude}/${e.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Xem bản đồ
+            </a>
+          </>
+        )}
+      </span>
     </div>
   );
 }

@@ -370,6 +370,16 @@ export interface LoginEventEntry {
   userAgent: string | null;
   occurredAt: string;
   user: { name: string } | null;
+  // Vị trí suy ra từ IP; geoCheckedAt null = chưa tra xong, countryCode null mà đã tra = IP nội bộ.
+  countryCode: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  isp: string | null;
+  asn: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geoCheckedAt: string | null;
 }
 
 export interface LoginEventsPage {
@@ -399,6 +409,7 @@ export const loginEventsApi = {
     websiteId?: string;
     username?: string;
     success?: string;
+    area?: string;
     from?: string;
     to?: string;
     page: number;

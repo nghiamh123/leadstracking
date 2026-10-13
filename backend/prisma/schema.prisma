@@ -387,6 +387,18 @@ model LoginEvent {
   occurredAt DateTime @map("occurred_at")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  // Vị trí suy ra từ IP (tra bằng dịch vụ GeoIP, độ chính xác cỡ thành phố/nhà mạng).
+  // geoCheckedAt null = chưa tra (cron sẽ tra bù); có giá trị mà countryCode null = IP nội bộ/không tra được.
+  countryCode  String?   @map("country_code")
+  country      String?
+  region       String?
+  city         String?
+  isp          String?
+  asn          String?
+  latitude     Float?
+  longitude    Float?
+  geoCheckedAt DateTime? @map("geo_checked_at")
+
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 

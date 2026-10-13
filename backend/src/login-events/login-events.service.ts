@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { buildPageMeta } from '../common/pagination.js';
 import { addDays, fromVnDateTime, startOfTodayVn } from '../common/vn-time.js';
 import { IngestLoginEventDto } from './dto/ingest-login-event.dto.js';
+import { GeoIpService } from './geo-ip.service.js';
 
 const RETENTION_DAYS = 90;
 // Từ ngần này lần đăng nhập sai trong 1 giờ trên cùng 1 website + username thì coi là đáng ngờ.
@@ -20,7 +21,10 @@ function normalizeDomain(raw: string): string {
 
 @Injectable()
 export class LoginEventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private geoIp: GeoIpService,
+  ) {}
 
   async ingest(dto: IngestLoginEventDto) {
     const domain = normalizeDomain(dto.domain);
@@ -48,13 +52,62 @@ export class LoginEventsService {
       },
       select: { id: true },
     });
+    // Tra vị trí sau khi đã trả lời website: không làm chậm đăng nhập, lỗi thì cron tra bù.
+    void this.enrichGeo(event.id, dto.ip).catch(() => undefined);
     return { id: event.id };
+  }
+
+  /** Tra vị trí cho 1 lượt (dùng lại kết quả của lượt cũ cùng IP nếu có) rồi ghi vào DB. */
+  private async enrichGeo(eventId: string, ip?: string | null) {
+    if (!ip) return;
+    const known = await this.prisma.loginEvent.findFirst({
+      where: { ip, geoCheckedAt: { not: null } },
+      orderBy: { geoCheckedAt: 'desc' },
+    });
+    const geo = known
+      ? {
+          countryCode: known.countryCode,
+          country: known.country,
+          region: known.region,
+          city: known.city,
+          isp: known.isp,
+          asn: known.asn,
+          latitude: known.latitude,
+          longitude: known.longitude,
+        }
+      : await this.geoIp.lookup(ip);
+    if (!geo) return; // thất bại: để geoCheckedAt = null cho cron thử lại
+    await this.prisma.loginEvent.update({
+      where: { id: eventId },
+      data: { ...geo, geoCheckedAt: new Date() },
+    });
+  }
+
+  /** Tra bù vị trí cho các lượt chưa có (lượt cũ trước khi có tính năng, hoặc lần tra trước bị lỗi mạng). */
+  @Cron('*/10 * * * *')
+  async backfillGeo() {
+    const pending = await this.prisma.loginEvent.findMany({
+      where: { ip: { not: null }, geoCheckedAt: null },
+      distinct: ['ip'],
+      select: { ip: true },
+      take: 20,
+    });
+    for (const { ip } of pending) {
+      if (!ip) continue;
+      const geo = await this.geoIp.lookup(ip);
+      if (!geo) continue;
+      await this.prisma.loginEvent.updateMany({
+        where: { ip, geoCheckedAt: null },
+        data: { ...geo, geoCheckedAt: new Date() },
+      });
+    }
   }
 
   async findAll(filters: {
     websiteId?: string;
     username?: string;
     success?: string;
+    area?: string;
     from?: string;
     to?: string;
     page?: number;
@@ -64,6 +117,9 @@ export class LoginEventsService {
       websiteId: filters.websiteId || undefined,
       username: filters.username ? { contains: filters.username, mode: 'insensitive' as const } : undefined,
       success: filters.success === 'true' ? true : filters.success === 'false' ? false : undefined,
+      // area=vn: trong nước; area=foreign: nước ngoài (đã tra được vị trí và không phải Việt Nam)
+      countryCode:
+        filters.area === 'vn' ? 'VN' : filters.area === 'foreign' ? { not: null as null, notIn: ['VN'] } : undefined,
       occurredAt:
         filters.from || filters.to
           ? {
