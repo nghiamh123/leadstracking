@@ -42,12 +42,21 @@ function setup(opts: { ticket?: Record<string, unknown> | null; assignee?: Recor
 describe('TicketsService', () => {
   it('ghi bộ phận = role người tạo', async () => {
     const { service, prisma } = setup();
-    await service.create(sales, { title: '  Lỗi form  ', description: 'Không gửi được' });
+    await service.create(sales, { title: '  Lỗi form  ', description: 'Không gửi được', pageUrl: ' /leads ' });
     expect(prisma.ticket.create.mock.calls[0][0].data).toMatchObject({
       title: 'Lỗi form',
+      pageUrl: '/leads',
       department: 'sales',
       createdById: 'rep1',
     });
+  });
+
+  it('bắt buộc có link trang gặp lỗi', async () => {
+    const { service, prisma } = setup();
+    await expect(service.create(sales, { title: 'Lỗi', description: 'x', pageUrl: '   ' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.ticket.create).not.toHaveBeenCalled();
   });
 
   it('không-admin chỉ thấy ticket của mình, admin thấy tất cả', async () => {

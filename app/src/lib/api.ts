@@ -490,7 +490,7 @@ export interface Ticket {
   imagesPurgedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  website: { id: string; name: string } | null;
+  website: { id: string; name: string; domain: string } | null;
   createdBy: TicketUser;
   assignee: TicketUser | null;
   _count: { comments: number; images: number };
@@ -524,7 +524,7 @@ export interface TicketInput {
   category: TicketCategory;
   priority: TicketPriority;
   websiteId?: string;
-  pageUrl?: string;
+  pageUrl: string;
 }
 
 export const ticketsApi = {

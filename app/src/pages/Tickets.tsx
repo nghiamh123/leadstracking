@@ -366,6 +366,7 @@ function CreateTicketModal({
     const errs: Record<string, string> = {};
     if (!form.title.trim()) errs.title = "Nhập tiêu đề ngắn gọn";
     if (!form.description.trim()) errs.description = "Mô tả lỗi để dev có thể tái hiện";
+    if (!form.pageUrl.trim()) errs.pageUrl = "Dán link trang gặp lỗi";
     setErrors(errs);
     setFormError(null);
     if (Object.keys(errs).length > 0) return;
@@ -375,7 +376,7 @@ function CreateTicketModal({
       const ticket = await ticketsApi.create({
         ...form,
         websiteId: form.websiteId || undefined,
-        pageUrl: form.pageUrl?.trim() || undefined,
+        pageUrl: form.pageUrl.trim(),
       });
       // Ticket đã tạo; ảnh tải lên từng cái một, ảnh lỗi không làm mất ticket.
       const uploadErrors: string[] = [];
@@ -446,12 +447,13 @@ function CreateTicketModal({
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium uppercase tracking-wider text-muted">Trang gặp lỗi</span>
           <input
-            value={form.pageUrl ?? ""}
+            value={form.pageUrl}
             maxLength={500}
             onChange={(e) => setForm((f) => ({ ...f, pageUrl: e.target.value }))}
             placeholder="VD: /leads hoặc https://..."
             className={inputClass}
           />
+          {errors.pageUrl && <span className="text-xs text-pale-red-ink">{errors.pageUrl}</span>}
         </label>
 
         <label className="flex flex-col gap-1 sm:col-span-2">
@@ -632,7 +634,20 @@ function TicketDetailModal({
             </Info>
             <Info label="Tạo lúc">{formatDateTime(ticket.createdAt)}</Info>
             <Info label="Website">{ticket.website?.name ?? "—"}</Info>
-            <Info label="Trang gặp lỗi">{ticket.pageUrl ?? "—"}</Info>
+            <Info label="Trang gặp lỗi">
+              {ticket.pageUrl ? (
+                <a
+                  href={pageHref(ticket.pageUrl, ticket.website?.domain)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-pale-blue-ink underline underline-offset-2"
+                >
+                  {ticket.pageUrl}
+                </a>
+              ) : (
+                "—"
+              )}
+            </Info>
             <Info label="Người xử lý">{ticket.assignee?.name ?? "Chưa có"}</Info>
             <Info label="Xử lý xong lúc">{ticket.resolvedAt ? formatDateTime(ticket.resolvedAt) : "—"}</Info>
           </dl>
@@ -857,6 +872,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </section>
   );
+}
+
+/** Link tuyệt đối từ URL người dùng nhập: "/path" gắn vào domain website (hoặc app này), thiếu scheme thì thêm https. */
+function pageHref(pageUrl: string, domain?: string): string {
+  const url = pageUrl.trim();
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) {
+    const host = domain?.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    return host ? `https://${host}${url}` : `${window.location.origin}${url}`;
+  }
+  return `https://${url}`;
 }
 
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
