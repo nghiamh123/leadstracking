@@ -26,7 +26,7 @@ export interface TicketFilters {
 
 const USER_SELECT = { id: true, name: true, role: true } as const;
 const LIST_INCLUDE = {
-  website: { select: { id: true, name: true } },
+  website: { select: { id: true, name: true, domain: true } },
   createdBy: { select: USER_SELECT },
   assignee: { select: USER_SELECT },
   _count: { select: { comments: true, images: true } },
@@ -118,6 +118,8 @@ export class TicketsService {
   }
 
   async create(user: JwtPayload, dto: CreateTicketDto) {
+    const pageUrl = dto.pageUrl.trim();
+    if (!pageUrl) throw new BadRequestException('Nhập link trang gặp lỗi');
     if (dto.websiteId) await this.assertWebsiteExists(dto.websiteId);
     return this.prisma.ticket.create({
       data: {
@@ -126,7 +128,7 @@ export class TicketsService {
         category: dto.category,
         priority: dto.priority,
         websiteId: dto.websiteId || undefined,
-        pageUrl: dto.pageUrl?.trim() || undefined,
+        pageUrl,
         department: user.role,
         createdById: user.sub,
       },
@@ -167,7 +169,7 @@ export class TicketsService {
         category: dto.category,
         priority: dto.priority,
         websiteId: dto.websiteId,
-        pageUrl: dto.pageUrl?.trim(),
+        pageUrl: dto.pageUrl?.trim() || undefined,
         status: dto.status,
         assigneeId,
         resolvedAt: this.nextResolvedAt(existing.resolvedAt, dto.status),

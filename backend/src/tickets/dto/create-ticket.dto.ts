@@ -24,8 +24,8 @@ export class CreateTicketDto {
   @IsString()
   websiteId?: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
-  pageUrl?: string;
+  pageUrl!: string;
 }
