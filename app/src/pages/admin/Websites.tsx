@@ -267,7 +267,16 @@ export function AdminWebsites() {
                 pagedWebsites.map((w) => (
                   <tr key={w.id} className="border-b border-border last:border-0">
                     <td className="px-6 py-3 font-medium text-ink-soft">{w.name}</td>
-                    <td className="px-6 py-3 text-muted">{w.domain}</td>
+                    <td className="px-6 py-3 text-muted">
+                      <a
+                        href={/^https?:\/\//i.test(w.domain) ? w.domain : `https://${w.domain}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-pale-blue-ink underline-offset-2 hover:underline"
+                      >
+                        {w.domain}
+                      </a>
+                    </td>
                     <td className="px-6 py-3">
                       <Badge tone={statusTone[w.status]}>{statusLabel[w.status]}</Badge>
                     </td>
