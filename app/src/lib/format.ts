@@ -34,3 +34,14 @@ export function formatDateTime(iso: string): string {
     minute: "2-digit",
   });
 }
+
+/**
+ * Tách chuỗi liên hệ thành danh sách SĐT 10 số. Một khách có thể để lại 2 số
+ * dính liền nhau (vd "03825170810826350017"), nên gom hết chữ số rồi cắt mỗi 10 số.
+ * "+84"/"84" đầu số được đổi về "0". Không có chữ số nào thì trả nguyên chuỗi.
+ */
+export function splitPhones(contact: string): string[] {
+  const digits = contact.replace(/(^|[^\d])\+?84(?=\d{9}(?!\d))/g, "$10").replace(/\D/g, "");
+  if (!digits) return contact.trim() ? [contact.trim()] : [];
+  return digits.match(/\d{1,10}/g) ?? [];
+}

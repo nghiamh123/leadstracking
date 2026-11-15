@@ -17,7 +17,7 @@ import { useWebsites, useUsers } from "../lib/hooks";
 import { leadsApi, ApiError, type SignalImportResult } from "../lib/api";
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, LEAD_STATUS_LABEL, LEAD_STATUS_OPTIONS } from "../lib/enumMap";
 import type { AuditLogEntry, Lead, LeadChannel, LeadStatus } from "../lib/types";
-import { formatDate } from "../lib/format";
+import { formatDate, splitPhones } from "../lib/format";
 
 const statusTone: Record<LeadStatus, "blue" | "yellow" | "green" | "red"> = {
   moi: "blue",
@@ -378,7 +378,11 @@ export function Leads() {
                         <td className="px-6 py-3 font-medium text-ink-soft">
                           {lead.customerName}
                         </td>
-                        <td className="px-6 py-3 tabular-nums text-muted">{lead.contact}</td>
+                        <td className="px-6 py-3 tabular-nums text-muted">
+                          {splitPhones(lead.contact).map((phone, i) => (
+                            <div key={i}>{phone}</div>
+                          ))}
+                        </td>
                         <td className="px-6 py-3 text-muted">
                           {websites.find((w) => w.id === lead.websiteId)?.name}
                         </td>
