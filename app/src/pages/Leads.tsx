@@ -55,6 +55,22 @@ function emptyForm(websiteId: string, salesRepId: string): Omit<Lead, "id"> {
   };
 }
 
+// Only the fields UpdateLeadDto accepts: the list endpoint returns extra
+// fields (createdAt, website, salesRep...) that the backend rejects.
+function toLeadInput(lead: Lead): Omit<Lead, "id"> {
+  return {
+    date: lead.date.slice(0, 10),
+    websiteId: lead.websiteId,
+    customerName: lead.customerName,
+    contact: lead.contact,
+    channel: lead.channel,
+    interest: lead.interest,
+    salesRepId: lead.salesRepId,
+    status: lead.status,
+    note: lead.note ?? "",
+  };
+}
+
 export function Leads() {
   const { websites } = useWebsites();
   const { users } = useUsers();
@@ -117,9 +133,8 @@ export function Leads() {
   }
 
   function startEdit(lead: Lead) {
-    const { id, ...rest } = lead;
-    setEditingId(id);
-    setForm(rest);
+    setEditingId(lead.id);
+    setForm(toLeadInput(lead));
     setFormError(null);
     setTab("form");
     setOpenMenu(null);

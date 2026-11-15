@@ -37,6 +37,20 @@ function emptyForm(websiteId: string, salesRepId: string): Omit<Order, "id"> {
   };
 }
 
+// Only the fields UpdateOrderDto accepts: the list endpoint returns extra
+// fields (createdAt, website, salesRep...) that the backend rejects.
+function toOrderInput(order: Order): Omit<Order, "id"> {
+  return {
+    date: order.date.slice(0, 10),
+    leadId: order.leadId ?? undefined,
+    websiteId: order.websiteId,
+    value: order.value,
+    product: order.product,
+    salesRepId: order.salesRepId,
+    status: order.status,
+  };
+}
+
 export function Orders() {
   const { websites } = useWebsites();
   const { users } = useUsers();
@@ -85,9 +99,8 @@ export function Orders() {
   }
 
   function startEdit(order: Order) {
-    const { id, ...rest } = order;
-    setEditingId(id);
-    setForm(rest);
+    setEditingId(order.id);
+    setForm(toOrderInput(order));
     setFormError(null);
     setTab("form");
     setOpenMenu(null);
