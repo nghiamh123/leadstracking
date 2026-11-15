@@ -36,15 +36,15 @@ export function Login() {
       <div className="fade-up relative w-full max-w-sm rounded-xl border border-border bg-surface p-8">
         <div className="mb-8 text-center">
           <img
-            src="/brand/logo-inogift.png"
-            alt="Inogift Sài Gòn"
+            src="/brand/logo-sangtaoviet.png"
+            alt="Sáng Tạo Việt"
             className="mx-auto mb-4 h-20 w-auto"
           />
           <h1 className="font-serif text-2xl tracking-tight text-ink">
             Phễu Chuyển Đổi
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Inogift Sài Gòn — nội bộ, đo lường Traffic → Lead → Đơn hàng
+            Sáng Tạo Việt — nội bộ, đo lường Traffic → Lead → Đơn hàng
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export function Login() {
             <input
               type="email"
               required
-              placeholder="ten@inogiftsaigon.vn"
+              placeholder="ten@congty.vn"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-ink"
@@ -94,7 +94,7 @@ export function Login() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-muted">
-          Chỉ dành cho nhân viên Inogift Sài Gòn. Liên hệ quản trị viên nếu bạn
+          Chỉ dành cho nhân viên Sáng Tạo Việt. Liên hệ quản trị viên nếu bạn
           chưa có tài khoản.
         </p>
         <div className="mt-4 flex items-center justify-center gap-2 border-t border-border pt-4 text-[11px] text-muted">
