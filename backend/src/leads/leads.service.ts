@@ -89,6 +89,24 @@ export class LeadsService {
     return { data, total, page, pageSize, totalPages };
   }
 
+  /**
+   * Danh sách gọn (id, tên, ngày, trạng thái) cho ô chọn "Liên kết với Lead" ở trang Đơn hàng -
+   * chỉ lead đang chăm sóc/đã chuyển đơn trong phạm vi quyền, thay vì trả toàn bộ lead kèm quan hệ.
+   */
+  findOptions(user: JwtPayload) {
+    return this.prisma.lead.findMany({
+      where: {
+        AND: [
+          leadOrderScope(user),
+          { deletedAt: null },
+          { status: { in: [LeadStatus.dang_cham_soc, LeadStatus.da_chuyen_don] } },
+        ],
+      },
+      select: { id: true, customerName: true, date: true, status: true },
+      orderBy: { date: 'desc' },
+    });
+  }
+
   async findHistory(id: string, user: JwtPayload) {
     await this.findOneInScope(id, user);
     return this.prisma.auditLog.findMany({

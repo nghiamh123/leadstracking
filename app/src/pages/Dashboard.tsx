@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DownloadSimple } from "@phosphor-icons/react";
 import { KpiCard } from "../components/ui/KpiCard";
 import { FunnelChart } from "../components/ui/FunnelChart";
@@ -8,13 +8,8 @@ import { Select } from "../components/ui/Select";
 import { useWebsites, useUsers } from "../lib/hooks";
 import { useSession } from "../lib/session";
 import { TodayTasks } from "../components/followups/TodayTasks";
-import {
-  dashboardApi,
-  type DashboardSummary,
-  type TrendPoint,
-  type WebsiteFunnelRow,
-  type WebsiteTrendResponse,
-} from "../lib/api";
+import { dashboardApi, type DashboardSummary, type WebsiteTrendResponse } from "../lib/api";
+import { useQuery } from "../lib/queryCache";
 import {
   previousRange,
   rangePresetLabels,
@@ -33,6 +28,7 @@ function deltaPct(current: number, prev: number) {
 }
 
 const emptySummary: DashboardSummary = { clicks: 0, leadCount: 0, orderCount: 0 };
+const emptyWebsiteTrend: WebsiteTrendResponse = { websites: [], data: [] };
 
 const DEFAULT_WEBSITE_DOMAIN = "quatangsg.vn";
 
@@ -42,58 +38,37 @@ export function Dashboard() {
   const { users } = useUsers();
   const salesReps = users.filter((u) => u.role === "sales");
 
-  const [websiteId, setWebsiteId] = useState("all");
-  const [defaultApplied, setDefaultApplied] = useState(false);
+  // null = người dùng chưa tự chọn: dùng website mặc định ngay khi có danh sách website (đã cache
+  // thì có ngay lúc mount, không phải chờ thêm một lượt render/effect).
+  const [pickedWebsiteId, setWebsiteId] = useState<string | null>(null);
+  const websiteId =
+    pickedWebsiteId ??
+    (websitesLoading
+      ? null
+      : (websites.find((w) => w.domain === DEFAULT_WEBSITE_DOMAIN)?.id ?? "all"));
   const [repId, setRepId] = useState("all");
   const [preset, setPreset] = useState<RangePreset>("30d");
 
-  const [current, setCurrent] = useState<DashboardSummary>(emptySummary);
-  const [previous, setPrevious] = useState<DashboardSummary>(emptySummary);
-  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
-  const [trendByWebsite, setTrendByWebsite] = useState<WebsiteTrendResponse>({
-    websites: [],
-    data: [],
-  });
-  const [websiteRows, setWebsiteRows] = useState<WebsiteFunnelRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const { start, end, days } = resolveRange(preset);
-
-  // Preselect the default website once the list arrives, before the first fetch.
-  useEffect(() => {
-    if (websitesLoading || defaultApplied) return;
-    const defaultSite = websites.find((w) => w.domain === DEFAULT_WEBSITE_DOMAIN);
-    if (defaultSite) setWebsiteId(defaultSite.id);
-    setDefaultApplied(true);
-  }, [websites, websitesLoading, defaultApplied]);
-
-  useEffect(() => {
-    if (!defaultApplied) return;
-    const prevRange = previousRange(start, days);
-    const filters = {
-      start,
-      end,
-      websiteId: websiteId === "all" ? undefined : websiteId,
-      salesRepId: repId === "all" ? undefined : repId,
-    };
-
-    setLoading(true);
-    Promise.all([
-      dashboardApi.summary(filters),
-      dashboardApi.summary({ ...filters, start: prevRange.start, end: prevRange.end }),
-      dashboardApi.trend(filters),
-      dashboardApi.trendByWebsite({ start, end }),
-      dashboardApi.byWebsite({ start, end, salesRepId: filters.salesRepId }),
-    ])
-      .then(([curr, prev, trend, trendByWebsiteRes, byWebsite]) => {
-        setCurrent(curr);
-        setPrevious(prev);
-        setTrendData(trend);
-        setTrendByWebsite(trendByWebsiteRes);
-        setWebsiteRows(byWebsite);
-      })
-      .finally(() => setLoading(false));
-  }, [start, end, days, websiteId, repId, defaultApplied]);
+  const prevRange = previousRange(start, days);
+  const filters = {
+    start,
+    end,
+    prevStart: prevRange.start,
+    prevEnd: prevRange.end,
+    websiteId: !websiteId || websiteId === "all" ? undefined : websiteId,
+    salesRepId: repId === "all" ? undefined : repId,
+  };
+  // Chờ biết website mặc định rồi mới tải, tránh tải 2 lần (tất cả → quatangsg.vn).
+  const { data: overview, loading } = useQuery(
+    websiteId ? `dashboard:${JSON.stringify(filters)}` : null,
+    () => dashboardApi.overview(filters),
+  );
+  const current = overview?.summary ?? emptySummary;
+  const previous = overview?.previous ?? emptySummary;
+  const trendData = overview?.trend ?? [];
+  const trendByWebsite = overview?.trendByWebsite ?? emptyWebsiteTrend;
+  const websiteRows = overview?.byWebsite ?? [];
 
   function exportCsv() {
     const url = dashboardApi.exportUrl({
@@ -111,7 +86,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
         <Select
           label="Website"
-          value={websiteId}
+          value={websiteId ?? "all"}
           onChange={(e) => setWebsiteId(e.target.value)}
           className="w-full sm:w-48"
         >
@@ -199,7 +174,7 @@ export function Dashboard() {
 
       <div className="fade-up rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-2 font-serif text-lg text-ink">Xu hướng theo ngày</h2>
-        {websiteId === "all" ? (
+        {(websiteId ?? "all") === "all" ? (
           <>
             <p className="mb-4 text-xs text-muted">
               Traffic (click) theo từng website — bấm vào tên để ẩn/hiện đường tương ứng.

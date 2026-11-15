@@ -7,7 +7,8 @@ import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Paginati
 import { ImageAdder } from "../components/tickets/ImageAdder";
 import { PendingImageThumb, ServerImageThumb } from "../components/tickets/ImageViews";
 import { MAX_TICKET_IMAGES } from "../lib/image";
-import { useWebsites } from "../lib/hooks";
+import { useWebsites, usePageState } from "../lib/hooks";
+import { useQuery } from "../lib/queryCache";
 import { useSession } from "../lib/session";
 import {
   ApiError,
@@ -16,7 +17,6 @@ import {
   type Ticket,
   type TicketDetail,
   type TicketInput,
-  type TicketsPage,
 } from "../lib/api";
 import {
   DEPARTMENT_LABEL,
@@ -64,10 +64,6 @@ export function Tickets() {
   const isAdmin = currentUser?.role === "admin";
   const { websites } = useWebsites();
 
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [statusCounts, setStatusCounts] = useState<TicketsPage["statusCounts"] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<"all" | TicketStatus>("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -76,11 +72,7 @@ export function Tickets() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -91,37 +83,30 @@ export function Tickets() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filterStatus, filterPriority, filterCategory, filterDepartment, search, pageSize]);
-
-  function reload() {
-    setLoading(true);
-    setLoadError(null);
-    return ticketsApi
-      .list({
-        status: filterStatus === "all" ? undefined : filterStatus,
-        priority: filterPriority === "all" ? undefined : (filterPriority as TicketPriority),
-        category: filterCategory === "all" ? undefined : (filterCategory as TicketCategory),
-        department: filterDepartment === "all" ? undefined : (filterDepartment as Role),
-        search: search || undefined,
-        page,
-        pageSize,
-      })
-      .then((res) => {
-        setTickets(res.data);
-        setStatusCounts(res.statusCounts);
-        setTotal(res.total);
-        setTotalPages(res.totalPages);
-      })
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Không tải được danh sách ticket."))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterPriority, filterCategory, filterDepartment, search, page, pageSize]);
+  const listFilters = {
+    status: filterStatus === "all" ? undefined : filterStatus,
+    priority: filterPriority === "all" ? undefined : (filterPriority as TicketPriority),
+    category: filterCategory === "all" ? undefined : (filterCategory as TicketCategory),
+    department: filterDepartment === "all" ? undefined : (filterDepartment as Role),
+    search: search || undefined,
+    pageSize,
+  };
+  // Đổi bộ lọc/số dòng mỗi trang thì quay lại trang 1.
+  const [page, setPage] = usePageState(JSON.stringify(listFilters));
+  const ticketsQuery = useQuery(`tickets:${JSON.stringify({ ...listFilters, page })}`, () =>
+    ticketsApi.list({ ...listFilters, page }),
+  );
+  const tickets = ticketsQuery.data?.data ?? [];
+  const statusCounts = ticketsQuery.data?.statusCounts ?? null;
+  const total = ticketsQuery.data?.total ?? 0;
+  const totalPages = ticketsQuery.data?.totalPages ?? 1;
+  const loading = ticketsQuery.loading;
+  const loadError = ticketsQuery.error
+    ? ticketsQuery.error instanceof ApiError
+      ? ticketsQuery.error.message
+      : "Không tải được danh sách ticket."
+    : null;
+  const reload = ticketsQuery.reload;
 
   const allCount = statusCounts ? Object.values(statusCounts).reduce((a, b) => a + b, 0) : 0;
   const colCount = isAdmin ? 8 : 7;

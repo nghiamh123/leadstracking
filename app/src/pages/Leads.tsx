@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   DotsThreeVertical,
   DownloadSimple,
@@ -13,7 +13,8 @@ import { Modal } from "../components/ui/Modal";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
 import { LeadCareModal } from "../components/followups/LeadCareModal";
 import { TodayTasks } from "../components/followups/TodayTasks";
-import { useWebsites, useUsers } from "../lib/hooks";
+import { useQuery } from "../lib/queryCache";
+import { useWebsites, useUsers, useDebouncedValue, usePageState } from "../lib/hooks";
 import { leadsApi, ApiError, type SignalImportResult } from "../lib/api";
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, LEAD_STATUS_LABEL, LEAD_STATUS_OPTIONS } from "../lib/enumMap";
 import type { AuditLogEntry, Lead, LeadChannel, LeadStatus } from "../lib/types";
@@ -59,8 +60,6 @@ export function Leads() {
   const { users } = useUsers();
   const salesReps = users.filter((u) => u.role === "sales" || u.role === "manager" || u.role === "admin");
 
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"list" | "form">("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Lead, "id">>(emptyForm("", ""));
@@ -89,40 +88,25 @@ export function Leads() {
   const [filterRep, setFilterRep] = useState("all");
   const [search, setSearch] = useState("");
 
-  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
+  const listFilters = {
+    websiteId: filterWebsite === "all" ? undefined : filterWebsite,
+    status: filterStatus === "all" ? undefined : (filterStatus as LeadStatus),
+    salesRepId: filterRep === "all" ? undefined : filterRep,
+    search: debouncedSearch || undefined,
+    pageSize,
+  };
   // Đổi bộ lọc/tìm kiếm/số dòng mỗi trang thì quay lại trang 1.
-  useEffect(() => {
-    setPage(1);
-  }, [filterWebsite, filterStatus, filterRep, search, pageSize]);
-
-  function reload() {
-    setLoading(true);
-    return leadsApi
-      .listPaged({
-        websiteId: filterWebsite === "all" ? undefined : filterWebsite,
-        status: filterStatus === "all" ? undefined : (filterStatus as LeadStatus),
-        salesRepId: filterRep === "all" ? undefined : filterRep,
-        search: search || undefined,
-        page,
-        pageSize,
-      })
-      .then((res) => {
-        setLeads(res.data);
-        setTotal(res.total);
-        setTotalPages(res.totalPages);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    const timer = setTimeout(reload, 250);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterWebsite, filterStatus, filterRep, search, page, pageSize]);
+  const [page, setPage] = usePageState(JSON.stringify(listFilters));
+  const leadsQuery = useQuery(`leads:${JSON.stringify({ ...listFilters, page })}`, () =>
+    leadsApi.listPaged({ ...listFilters, page }),
+  );
+  const leads = leadsQuery.data?.data ?? [];
+  const total = leadsQuery.data?.total ?? 0;
+  const totalPages = leadsQuery.data?.totalPages ?? 1;
+  const loading = leadsQuery.loading;
+  const reload = leadsQuery.reload;
 
   function validate(f: Omit<Lead, "id">) {
     const errs: Record<string, string> = {};

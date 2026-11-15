@@ -33,6 +33,8 @@ export class OrdersService {
     const include = {
       website: { select: { id: true, name: true } },
       salesRep: { select: { id: true, name: true } },
+      // Tên khách của lead liên kết - để trang Đơn hàng không phải tải toàn bộ danh sách lead.
+      lead: { select: { id: true, customerName: true } },
     };
 
     if (!filters.page) {

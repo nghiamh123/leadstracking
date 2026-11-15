@@ -10,6 +10,19 @@ import { DashboardService } from './dashboard.service.js';
 export class DashboardController {
   constructor(private dashboardService: DashboardService) {}
 
+  @Get('overview')
+  overview(
+    @CurrentUser() user: JwtPayload,
+    @Query('start') start: string,
+    @Query('end') end: string,
+    @Query('prevStart') prevStart: string,
+    @Query('prevEnd') prevEnd: string,
+    @Query('websiteId') websiteId?: string,
+    @Query('salesRepId') salesRepId?: string,
+  ) {
+    return this.dashboardService.overview(user, { start, end, prevStart, prevEnd, websiteId, salesRepId });
+  }
+
   @Get('summary')
   summary(
     @CurrentUser() user: JwtPayload,
