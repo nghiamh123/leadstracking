@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { leadOrderScope } from '../common/scope.js';
 import { buildPageMeta } from '../common/pagination.js';
+import { auditChanges } from '../common/audit-diff.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { AuditAction, LeadChannel, LeadStatus, Role } from '../generated/prisma/enums.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
@@ -147,9 +148,7 @@ export class LeadsService {
   async update(id: string, dto: UpdateLeadDto, user: JwtPayload) {
     const existing = await this.findOneInScope(id, user);
 
-    const changedFields = (Object.keys(dto) as (keyof UpdateLeadDto)[]).filter(
-      (key) => dto[key] !== undefined && String(dto[key]) !== String(existing[key as keyof typeof existing]),
-    );
+    const changes = auditChanges(dto, existing);
 
     const updated = await this.prisma.lead.update({
       where: { id },
@@ -159,15 +158,15 @@ export class LeadsService {
       },
     });
 
-    if (changedFields.length > 0) {
+    if (changes.length > 0) {
       await this.prisma.auditLog.createMany({
-        data: changedFields.map((field) => ({
+        data: changes.map(({ field, oldValue, newValue }) => ({
           entityType: 'lead',
           entityId: id,
           action: AuditAction.update,
           field,
-          oldValue: String(existing[field as keyof typeof existing] ?? ''),
-          newValue: String(dto[field] ?? ''),
+          oldValue,
+          newValue,
           changedById: user.sub,
         })),
       });
