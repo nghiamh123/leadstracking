@@ -75,15 +75,15 @@ export function SidebarContent({
     <div className="flex h-full flex-col gap-6 p-4">
       <div className="flex items-center gap-3 px-2 pt-2">
         <img
-          src="/brand/logo-inogift.png"
-          alt="Inogift Sài Gòn"
+          src="/brand/logo-sangtaoviet.png"
+          alt="Sáng Tạo Việt"
           className="h-12 w-auto shrink-0"
         />
         <div className="border-l border-border pl-3">
           <p className="font-serif text-base leading-tight text-ink">
             Phễu Chuyển Đổi
           </p>
-          <p className="text-[11px] text-muted">Inogift Sài Gòn</p>
+          <p className="text-[11px] text-muted">Sáng Tạo Việt</p>
         </div>
       </div>
 
