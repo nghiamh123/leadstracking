@@ -20,6 +20,11 @@ enum UserStatus {
   disabled
 }
 
+enum EmailTokenType {
+  verify_email
+  reset_password
+}
+
 enum WebsiteStatus {
   connected
   error
@@ -111,6 +116,12 @@ model User {
   role         Role
   team         String?
   status       UserStatus @default(active)
+  /// Lúc người dùng bấm link xác minh gửi về hộp thư - null = chưa xác minh, không gửi email thông báo.
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  /// Tuỳ chọn nhận email thông báo theo từng loại (trang Tài khoản).
+  notifyTickets     Boolean   @default(true) @map("notify_tickets")
+  notifyReminders   Boolean   @default(true) @map("notify_reminders")
+  notifyDailyDigest Boolean   @default(true) @map("notify_daily_digest")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
@@ -127,6 +138,7 @@ model User {
   assignedTickets        Ticket[]        @relation("TicketAssignee")
   ticketComments         TicketComment[]
   ticketImages           TicketImage[]
+  emailTokens            EmailToken[]
 
   @@map("users")
 }
@@ -340,6 +352,8 @@ model Reminder {
   dueAt     DateTime  @map("due_at")
   note      String
   doneAt    DateTime? @map("done_at")
+  /// Lúc đã gửi email nhắc đến hạn - tránh gửi trùng; đổi dueAt thì reset về null.
+  notifiedAt DateTime? @map("notified_at")
   /// "manual" (tạo trên trang Lead) | "assistant" (Trợ lý AI tạo theo yêu cầu người dùng)
   source    String    @default("manual")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -474,4 +488,29 @@ model TicketImage {
 
   @@index([ticketId])
   @@map("ticket_images")
+}
+
+/// Token dùng 1 lần gửi qua email (xác minh email, đặt lại mật khẩu). Chỉ lưu SHA-256 của token,
+/// lộ database cũng không dùng được link.
+model EmailToken {
+  id        String         @id @default(cuid())
+  userId    String         @map("user_id")
+  type      EmailTokenType
+  tokenHash String         @unique @map("token_hash")
+  expiresAt DateTime       @map("expires_at")
+  usedAt    DateTime?      @map("used_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt])
+  @@map("email_tokens")
+}
+
+/// Khoá chống chạy trùng cron gửi email (VD pm2 nhiều instance): mỗi (job, ngày) chỉ insert được 1 lần.
+model NotificationRun {
+  key       String   @id
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notification_runs")
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { LockKey, Warning } from "@phosphor-icons/react";
 import { useSession, ApiError } from "../lib/session";
 
@@ -91,6 +91,12 @@ export function Login() {
             <LockKey size={16} />
             {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
+          <Link
+            to="/forgot-password"
+            className="text-center text-xs font-medium text-ink-soft hover:text-ink"
+          >
+            Quên mật khẩu?
+          </Link>
         </form>
 
         <p className="mt-6 text-center text-[11px] text-muted">

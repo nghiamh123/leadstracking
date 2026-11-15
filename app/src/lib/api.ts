@@ -74,7 +74,14 @@ export interface MeResponse {
   role: Role;
   team: string | null;
   status: string;
+  /** null = chưa xác minh email → chưa nhận email thông báo. */
+  emailVerifiedAt: string | null;
+  notifyTickets: boolean;
+  notifyReminders: boolean;
+  notifyDailyDigest: boolean;
 }
+
+export type NotificationSettings = Pick<MeResponse, "notifyTickets" | "notifyReminders" | "notifyDailyDigest">;
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -85,6 +92,22 @@ export const authApi = {
     apiFetch<{ ok: true }>("/auth/password", {
       method: "PATCH",
       body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  updateNotificationSettings: (data: Partial<NotificationSettings>) =>
+    apiFetch<MeResponse>("/auth/notification-settings", { method: "PATCH", body: JSON.stringify(data) }),
+  sendVerification: () =>
+    apiFetch<{ ok: true; alreadyVerified?: true }>("/auth/verify-email/send", { method: "POST" }),
+  confirmEmail: (token: string) =>
+    apiFetch<{ ok: true; email: string }>("/auth/verify-email/confirm", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  forgotPassword: (email: string) =>
+    apiFetch<{ ok: true }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, newPassword: string) =>
+    apiFetch<{ ok: true }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, newPassword }),
     }),
 };
 
@@ -162,6 +185,8 @@ export const usersApi = {
       method: "PATCH",
       body: JSON.stringify({ newPassword }),
     }),
+  sendVerification: (id: string) =>
+    apiFetch<{ ok: true; alreadyVerified?: true }>(`/users/${id}/send-verification`, { method: "POST" }),
 };
 
 // ---- Dashboard ----

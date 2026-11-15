@@ -119,6 +119,8 @@ export class FollowupsService {
       data: {
         doneAt: data.done === undefined ? undefined : data.done ? new Date() : null,
         dueAt: data.dueAt,
+        // Đổi hạn thì gửi lại email nhắc khi đến hạn mới.
+        notifiedAt: data.dueAt ? null : undefined,
         note: data.note?.trim(),
       },
       include: { lead: leadRef },

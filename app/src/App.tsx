@@ -12,6 +12,8 @@ import { AdminHostings } from "./pages/admin/Hostings";
 import { AdminUsers } from "./pages/admin/Users";
 import { AdminSyncLogs } from "./pages/admin/SyncLogs";
 import { AdminLoginLogs } from "./pages/admin/LoginLogs";
+import { Account } from "./pages/Account";
+import { ForgotPassword, ResetPassword, VerifyEmail } from "./pages/EmailLinks";
 import { useSession } from "./lib/session";
 
 function ProtectedLayout() {
@@ -31,6 +33,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/keywords" element={<Keywords />} />
@@ -38,6 +43,7 @@ function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/assistant" element={<Assistant />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/admin/websites" element={<AdminWebsites />} />
         <Route path="/admin/hostings" element={<AdminHostings />} />
         <Route path="/admin/users" element={<AdminUsers />} />

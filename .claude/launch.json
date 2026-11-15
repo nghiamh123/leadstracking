@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "app", "vite", "app", "--port", "5173"],
+      "port": 5173
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "backend", "run", "start:dev"],
+      "port": 3001
+    }
+  ]
+}

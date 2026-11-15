@@ -9,6 +9,9 @@ interface SessionState {
   currentUser: MeResponse | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Tải lại thông tin người dùng (sau khi xác minh email, đổi tuỳ chọn thông báo...). */
+  refreshUser: () => Promise<void>;
+  setCurrentUser: (user: MeResponse) => void;
 }
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -38,9 +41,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isLoading,
       currentUser,
       login: async (email, password) => {
-        const user = await authApi.login(email, password);
-        setCurrentUser(user);
+        await authApi.login(email, password);
+        // /auth/me trả đủ trạng thái xác minh email + tuỳ chọn thông báo.
+        setCurrentUser(await authApi.me());
       },
+      refreshUser: async () => {
+        setCurrentUser(await authApi.me().catch(() => null));
+      },
+      setCurrentUser,
       logout: async () => {
         await authApi.logout().catch(() => {});
         setCurrentUser(null);

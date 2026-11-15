@@ -4,6 +4,7 @@ import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { AccountEmailService } from './account-email.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 
 @Global()
@@ -21,7 +22,7 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, PassportModule],
+  providers: [AuthService, AccountEmailService, JwtStrategy],
+  exports: [AuthService, AccountEmailService, PassportModule],
 })
 export class AuthModule {}

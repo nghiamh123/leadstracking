@@ -5,6 +5,19 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { UserStatus } from '../generated/prisma/enums.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 
+const ME_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  team: true,
+  status: true,
+  emailVerifiedAt: true,
+  notifyTickets: true,
+  notifyReminders: true,
+  notifyDailyDigest: true,
+} as const;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -53,9 +66,21 @@ export class AuthService {
   }
 
   async me(userId: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.user.findUnique({ where: { id: userId }, select: ME_SELECT });
+  }
+
+  async updateNotificationSettings(
+    userId: string,
+    data: { notifyTickets?: boolean; notifyReminders?: boolean; notifyDailyDigest?: boolean },
+  ) {
+    return this.prisma.user.update({
       where: { id: userId },
-      select: { id: true, name: true, email: true, role: true, team: true, status: true },
+      data: {
+        notifyTickets: data.notifyTickets,
+        notifyReminders: data.notifyReminders,
+        notifyDailyDigest: data.notifyDailyDigest,
+      },
+      select: ME_SELECT,
     });
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChatCircle, MagnifyingGlass, PaperPlaneRight, Paperclip, Plus, Trash, Warning } from "@phosphor-icons/react";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
@@ -82,7 +83,16 @@ export function Tickets() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [creating, setCreating] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  // ?ticket=<id> - link "Mở ticket" trong email thông báo mở thẳng chi tiết ticket.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openId, setOpenIdState] = useState<string | null>(() => searchParams.get("ticket"));
+  function setOpenId(id: string | null) {
+    setOpenIdState(id);
+    if (!id && searchParams.has("ticket")) {
+      searchParams.delete("ticket");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
   const [notice, setNotice] = useState<string | null>(null);
 
   // Gõ xong mới tìm, tránh gọi API mỗi phím.
