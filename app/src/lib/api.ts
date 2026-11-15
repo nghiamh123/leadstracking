@@ -196,7 +196,25 @@ export interface WebsiteTrendResponse {
   data: WebsiteTrendPoint[];
 }
 
+export interface DashboardOverview {
+  summary: DashboardSummary;
+  previous: DashboardSummary;
+  /** Chỉ có khi lọc theo 1 website. */
+  trend: TrendPoint[] | null;
+  /** Chỉ có khi xem tất cả website. */
+  trendByWebsite: WebsiteTrendResponse | null;
+  byWebsite: WebsiteFunnelRow[];
+}
+
 export const dashboardApi = {
+  overview: (params: {
+    start: string;
+    end: string;
+    prevStart: string;
+    prevEnd: string;
+    websiteId?: string;
+    salesRepId?: string;
+  }) => apiFetch<DashboardOverview>(`/dashboard/overview${qs(params)}`),
   summary: (params: { start: string; end: string; websiteId?: string; salesRepId?: string }) =>
     apiFetch<DashboardSummary>(`/dashboard/summary${qs(params)}`),
   trend: (params: { start: string; end: string; websiteId?: string; salesRepId?: string }) =>
@@ -248,10 +266,19 @@ export interface LeadsPage {
   totalPages: number;
 }
 
+export interface LeadOption {
+  id: string;
+  customerName: string;
+  date: string;
+  status: LeadStatus;
+}
+
 export const leadsApi = {
   /** Không phân trang - dùng cho dropdown/tra cứu (vd liên kết Lead ở trang Đơn hàng). */
   list: (params: { websiteId?: string; status?: LeadStatus; salesRepId?: string; search?: string }) =>
     apiFetch<Lead[]>(`/leads${qs(params)}`),
+  /** Danh sách gọn cho ô chọn "Liên kết với Lead" (lead đang chăm sóc/đã chuyển đơn). */
+  options: () => apiFetch<LeadOption[]>("/leads/options"),
   listPaged: (params: {
     websiteId?: string;
     status?: LeadStatus;

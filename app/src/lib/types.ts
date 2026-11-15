@@ -61,6 +61,8 @@ export interface Order {
   product: string;
   salesRepId: string;
   status: OrderStatus;
+  /** Lead liên kết (danh sách đơn hàng trả kèm để hiện tên khách). */
+  lead?: { id: string; customerName: string } | null;
 }
 
 export interface AppUser {

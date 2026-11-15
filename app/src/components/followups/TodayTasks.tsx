@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BellSimple, Check } from "@phosphor-icons/react";
 import { followupsApi, type Reminder } from "../../lib/api";
 import { LeadCareModal } from "./LeadCareModal";
 import { localDate } from "./labels";
+import { useQuery } from "../../lib/queryCache";
+
+export const REMINDERS_KEY = "reminders:mine";
 
 const UPCOMING_DAYS = 7;
 
@@ -21,12 +24,20 @@ function dueLabel(iso: string, today: string): string {
  * `refreshKey` đổi giá trị → tải lại (vd sau khi đặt nhắc ở nơi khác trên trang).
  */
 export function TodayTasks({ refreshKey = 0 }: { refreshKey?: number }) {
-  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [openLead, setOpenLead] = useState<{ id: string; customerName: string } | null>(null);
-  const [reload, setReload] = useState(0);
+  // Dùng cache chung: chuyển qua lại Tổng quan/Lead thấy ngay, tải lại ngầm.
+  const { data, reload } = useQuery(REMINDERS_KEY, followupsApi.myReminders);
+  // Ẩn ngay lịch vừa đánh dấu xong, không chờ tải lại.
+  const [hidden, setHidden] = useState<string[]>([]);
+  const reminders = (data ?? []).filter((r) => !hidden.includes(r.id));
 
+  const firstRender = useRef(true);
   useEffect(() => {
-    followupsApi.myReminders().then(setReminders).catch(() => setReminders([]));
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    reload();
   }, [refreshKey, reload]);
 
   const today = localDate(new Date());
@@ -44,12 +55,13 @@ export function TodayTasks({ refreshKey = 0 }: { refreshKey?: number }) {
   if (overdue.length + dueToday.length + upcoming.length === 0) return null;
 
   async function markDone(id: string) {
-    setReminders((rs) => rs.filter((r) => r.id !== id));
+    setHidden((ids) => [...ids, id]);
     try {
       await followupsApi.setDone(id, true);
     } catch {
-      setReload((n) => n + 1);
+      setHidden((ids) => ids.filter((x) => x !== id));
     }
+    reload();
   }
 
   const groups: { title: string; items: Reminder[]; tone: string }[] = [
@@ -113,7 +125,7 @@ export function TodayTasks({ refreshKey = 0 }: { refreshKey?: number }) {
         <LeadCareModal
           lead={openLead}
           onClose={() => setOpenLead(null)}
-          onChanged={() => setReload((n) => n + 1)}
+          onChanged={() => void reload()}
         />
       )}
     </div>

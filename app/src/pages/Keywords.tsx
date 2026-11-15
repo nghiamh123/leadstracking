@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CaretDown, CaretUp, MagnifyingGlass } from "@phosphor-icons/react";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
-import { useWebsites } from "../lib/hooks";
+import { useWebsites, useDebouncedValue, usePageState } from "../lib/hooks";
+import { useQuery } from "../lib/queryCache";
 import { keywordsApi } from "../lib/api";
 import type { Keyword } from "../lib/types";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -23,39 +24,24 @@ export function Keywords() {
     key: "impressions",
     dir: "desc",
   });
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
-  const [rows, setRows] = useState<Keyword[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-
+  const debouncedQuery = useDebouncedValue(query, 250);
+  const listFilters = {
+    websiteId: websiteId === "all" ? undefined : websiteId,
+    search: debouncedQuery || undefined,
+    sortBy: sort.key,
+    sortDir: sort.dir,
+    pageSize,
+  };
   // Đổi bộ lọc/sắp xếp/số dòng mỗi trang thì quay lại trang 1.
-  useEffect(() => {
-    setPage(1);
-  }, [websiteId, query, sort, pageSize]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(true);
-      keywordsApi
-        .list({
-          websiteId: websiteId === "all" ? undefined : websiteId,
-          search: query || undefined,
-          sortBy: sort.key,
-          sortDir: sort.dir,
-          page,
-          pageSize,
-        })
-        .then((res) => {
-          setRows(res.data);
-          setTotal(res.total);
-          setTotalPages(res.totalPages);
-        })
-        .finally(() => setLoading(false));
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [websiteId, query, sort, page, pageSize]);
+  const [page, setPage] = usePageState(JSON.stringify(listFilters));
+  const keywordsQuery = useQuery(`keywords:${JSON.stringify({ ...listFilters, page })}`, () =>
+    keywordsApi.list({ ...listFilters, page }),
+  );
+  const rows = keywordsQuery.data?.data ?? [];
+  const total = keywordsQuery.data?.total ?? 0;
+  const totalPages = keywordsQuery.data?.totalPages ?? 1;
+  const loading = keywordsQuery.loading;
 
   function toggleSort(key: SortKey) {
     setSort((s) =>

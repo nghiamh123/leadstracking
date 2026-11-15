@@ -66,6 +66,11 @@ export class LeadsController {
     });
   }
 
+  @Get('options')
+  options(@CurrentUser() user: JwtPayload) {
+    return this.leadsService.findOptions(user);
+  }
+
   @Get('template.csv')
   template(@Res() res: Response) {
     res.type('text/csv').send(TEMPLATE_HEADER.join(','));
