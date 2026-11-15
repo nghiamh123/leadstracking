@@ -103,14 +103,14 @@ describe('DashboardService', () => {
     expect(res.data[2]).toEqual({ date: '2026-11-03', w1: 7, w2: 0 });
   });
 
-  it('byWebsite: tỉ lệ chuyển đổi, chia cho 0 thì = 0', async () => {
+  it('byWebsite: gom nhóm theo website (không N+1), tỉ lệ chuyển đổi, chia cho 0 thì = 0', async () => {
     const { service, prisma } = setup();
-    prisma.gscDailyTraffic.aggregate
-      .mockResolvedValueOnce({ _sum: { clicks: 200 } })
-      .mockResolvedValueOnce({ _sum: { clicks: 0 } });
-    prisma.lead.count.mockResolvedValueOnce(20).mockResolvedValueOnce(0);
-    prisma.order.count.mockResolvedValueOnce(5).mockResolvedValueOnce(0);
+    const groupBy = (rows: unknown[]) => vi.fn().mockResolvedValue(rows);
+    Object.assign(prisma.gscDailyTraffic, { groupBy: groupBy([{ websiteId: 'w1', _sum: { clicks: 200 } }]) });
+    Object.assign(prisma.lead, { groupBy: groupBy([{ websiteId: 'w1', _count: { _all: 20 } }]) });
+    Object.assign(prisma.order, { groupBy: groupBy([{ websiteId: 'w1', _count: { _all: 5 } }]) });
     const [a, b] = await service.byWebsite(sales, range);
+    expect(prisma.lead.count).not.toHaveBeenCalled();
     expect(a).toEqual({
       websiteId: 'w1',
       websiteName: 'A',
@@ -121,6 +121,22 @@ describe('DashboardService', () => {
       orderRate: 25,
       totalRate: 2.5,
     });
-    expect(b).toMatchObject({ leadRate: 0, orderRate: 0, totalRate: 0 });
+    expect(b).toMatchObject({ clicks: 0, leadCount: 0, orderCount: 0, leadRate: 0, orderRate: 0, totalRate: 0 });
+  });
+
+  it('overview: 1 request gồm kỳ này + kỳ trước; chỉ tính biểu đồ đang hiển thị', async () => {
+    const { service, prisma } = setup();
+    for (const model of [prisma.gscDailyTraffic, prisma.lead, prisma.order]) {
+      Object.assign(model, { groupBy: vi.fn().mockResolvedValue([]) });
+    }
+    const all = await service.overview(sales, { ...range, prevStart: '2026-10-29', prevEnd: '2026-10-31' });
+    expect(all.trend).toBeNull();
+    expect(all.trendByWebsite?.data).toHaveLength(3);
+    expect(all.previous).toEqual({ clicks: 200, leadCount: 20, orderCount: 5 });
+    expect(all.byWebsite).toHaveLength(2);
+
+    const one = await service.overview(sales, { ...range, websiteId: 'w1', prevStart: '2026-10-29', prevEnd: '2026-10-31' });
+    expect(one.trendByWebsite).toBeNull();
+    expect(one.trend).toHaveLength(3);
   });
 });

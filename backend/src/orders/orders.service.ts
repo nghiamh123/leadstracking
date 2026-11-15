@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { leadOrderScope } from '../common/scope.js';
 import { buildPageMeta } from '../common/pagination.js';
+import { auditChanges } from '../common/audit-diff.js';
 import { AuditAction, OrderStatus } from '../generated/prisma/enums.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 import type { CreateOrderDto } from './dto/create-order.dto.js';
@@ -33,6 +34,8 @@ export class OrdersService {
     const include = {
       website: { select: { id: true, name: true } },
       salesRep: { select: { id: true, name: true } },
+      // Tên khách của lead liên kết - để trang Đơn hàng không phải tải toàn bộ danh sách lead.
+      lead: { select: { id: true, customerName: true } },
     };
 
     if (!filters.page) {
@@ -92,24 +95,22 @@ export class OrdersService {
     const existing = await this.findOneInScope(id, user);
     if (dto.leadId) await this.assertLeadExists(dto.leadId);
 
-    const changedFields = (Object.keys(dto) as (keyof UpdateOrderDto)[]).filter(
-      (key) => dto[key] !== undefined && String(dto[key]) !== String(existing[key as keyof typeof existing]),
-    );
+    const changes = auditChanges(dto, existing);
 
     const updated = await this.prisma.order.update({
       where: { id },
       data: { ...dto, date: dto.date ? new Date(dto.date) : undefined },
     });
 
-    if (changedFields.length > 0) {
+    if (changes.length > 0) {
       await this.prisma.auditLog.createMany({
-        data: changedFields.map((field) => ({
+        data: changes.map(({ field, oldValue, newValue }) => ({
           entityType: 'order',
           entityId: id,
           action: AuditAction.update,
           field,
-          oldValue: String(existing[field as keyof typeof existing] ?? ''),
-          newValue: String(dto[field] ?? ''),
+          oldValue,
+          newValue,
           changedById: user.sub,
         })),
       });

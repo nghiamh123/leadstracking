@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   DotsThreeVertical,
   DownloadSimple,
@@ -10,10 +10,11 @@ import {
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../components/ui/Pagination";
-import { useWebsites, useUsers } from "../lib/hooks";
+import { useWebsites, useUsers, usePageState } from "../lib/hooks";
+import { useQuery } from "../lib/queryCache";
 import { leadsApi, ordersApi, ApiError } from "../lib/api";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_OPTIONS } from "../lib/enumMap";
-import type { Lead, Order, OrderStatus } from "../lib/types";
+import type { Order, OrderStatus } from "../lib/types";
 import { formatCurrency, formatDate } from "../lib/format";
 
 const statusTone: Record<OrderStatus, "yellow" | "green" | "red"> = {
@@ -36,14 +37,25 @@ function emptyForm(websiteId: string, salesRepId: string): Omit<Order, "id"> {
   };
 }
 
+// Only the fields UpdateOrderDto accepts: the list endpoint returns extra
+// fields (createdAt, website, salesRep...) that the backend rejects.
+function toOrderInput(order: Order): Omit<Order, "id"> {
+  return {
+    date: order.date.slice(0, 10),
+    leadId: order.leadId ?? undefined,
+    websiteId: order.websiteId,
+    value: order.value,
+    product: order.product,
+    salesRepId: order.salesRepId,
+    status: order.status,
+  };
+}
+
 export function Orders() {
   const { websites } = useWebsites();
   const { users } = useUsers();
   const salesReps = users.filter((u) => u.role === "sales" || u.role === "manager" || u.role === "admin");
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"list" | "form">("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Order, "id">>(emptyForm("", ""));
@@ -57,44 +69,27 @@ export function Orders() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRep, setFilterRep] = useState("all");
 
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE_OPTIONS[0]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalValue, setTotalValue] = useState(0);
-
-  useEffect(() => {
-    leadsApi.list({}).then(setAllLeads);
-  }, []);
-
+  const listFilters = {
+    websiteId: filterWebsite === "all" ? undefined : filterWebsite,
+    status: filterStatus === "all" ? undefined : (filterStatus as OrderStatus),
+    salesRepId: filterRep === "all" ? undefined : filterRep,
+    pageSize,
+  };
   // Đổi bộ lọc/số dòng mỗi trang thì quay lại trang 1.
-  useEffect(() => {
-    setPage(1);
-  }, [filterWebsite, filterStatus, filterRep, pageSize]);
+  const [page, setPage] = usePageState(JSON.stringify(listFilters));
+  const ordersQuery = useQuery(`orders:${JSON.stringify({ ...listFilters, page })}`, () =>
+    ordersApi.listPaged({ ...listFilters, page }),
+  );
+  const orders = ordersQuery.data?.data ?? [];
+  const total = ordersQuery.data?.total ?? 0;
+  const totalPages = ordersQuery.data?.totalPages ?? 1;
+  const totalValue = ordersQuery.data?.totalValue ?? 0;
+  const loading = ordersQuery.loading;
+  const reload = ordersQuery.reload;
 
-  function reload() {
-    setLoading(true);
-    return ordersApi
-      .listPaged({
-        websiteId: filterWebsite === "all" ? undefined : filterWebsite,
-        status: filterStatus === "all" ? undefined : (filterStatus as OrderStatus),
-        salesRepId: filterRep === "all" ? undefined : filterRep,
-        page,
-        pageSize,
-      })
-      .then((res) => {
-        setOrders(res.data);
-        setTotal(res.total);
-        setTotalPages(res.totalPages);
-        setTotalValue(res.totalValue);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterWebsite, filterStatus, filterRep, page, pageSize]);
+  // Danh sách lead để liên kết chỉ cần khi mở form - không tải toàn bộ lead mỗi lần vào trang.
+  const { data: linkableLeads = [] } = useQuery(tab === "form" ? "leads:options" : null, leadsApi.options);
 
   function validate(f: Omit<Order, "id">) {
     const errs: Record<string, string> = {};
@@ -104,9 +99,8 @@ export function Orders() {
   }
 
   function startEdit(order: Order) {
-    const { id, ...rest } = order;
-    setEditingId(id);
-    setForm(rest);
+    setEditingId(order.id);
+    setForm(toOrderInput(order));
     setFormError(null);
     setTab("form");
     setOpenMenu(null);
@@ -153,10 +147,6 @@ export function Orders() {
     setImportErrors(result.errors);
     reload();
   }
-
-  const linkableLeads = allLeads.filter(
-    (l) => l.status === "da_chuyen_don" || l.status === "dang_cham_soc",
-  );
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -306,7 +296,7 @@ export function Orders() {
                           {salesReps.find((r) => r.id === order.salesRepId)?.name ?? "—"}
                         </td>
                         <td className="px-6 py-3 text-muted">
-                          {allLeads.find((l) => l.id === order.leadId)?.customerName ?? "—"}
+                          {order.lead?.customerName ?? "—"}
                         </td>
                         <td className="px-6 py-3">
                           <Badge tone={statusTone[order.status]}>

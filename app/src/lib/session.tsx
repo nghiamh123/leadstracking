@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { Role } from "./types";
 import { authApi, ApiError, type MeResponse } from "./api";
+import { clearQueryCache } from "./queryCache";
 
 interface SessionState {
   isAuthenticated: boolean;
@@ -42,6 +43,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       currentUser,
       login: async (email, password) => {
         await authApi.login(email, password);
+        // Dữ liệu cache được lọc theo quyền người dùng trước - không dùng lại cho tài khoản mới.
+        clearQueryCache();
         // /auth/me trả đủ trạng thái xác minh email + tuỳ chọn thông báo.
         setCurrentUser(await authApi.me());
       },
@@ -51,6 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setCurrentUser,
       logout: async () => {
         await authApi.logout().catch(() => {});
+        clearQueryCache();
         setCurrentUser(null);
       },
     }),

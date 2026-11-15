@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { X } from "@phosphor-icons/react";
 import { Sidebar, SidebarContent } from "./Sidebar";
@@ -6,6 +6,7 @@ import { Topbar } from "./Topbar";
 import { VerifyEmailBanner } from "./VerifyEmailBanner";
 import { useSession } from "../../lib/session";
 import { isPathAllowed } from "../../lib/nav";
+import { prefetchSharedData } from "../../lib/hooks";
 
 const titleByPath: Record<string, string> = {
   "/dashboard": "Tổng quan",
@@ -27,6 +28,10 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
   const title = titleByPath[pathname] ?? "Tổng quan";
+
+  useEffect(() => {
+    prefetchSharedData(role);
+  }, [role]);
 
   if (!isPathAllowed(pathname, role)) {
     return <Navigate to="/dashboard" replace />;
