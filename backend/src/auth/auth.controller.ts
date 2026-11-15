@@ -6,6 +6,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 import { LoginDto } from './dto/login.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { AccountEmailService } from './account-email.service.js';
+import {
+  ConfirmEmailDto,
+  ForgotPasswordDto,
+  NotificationSettingsDto,
+  ResetPasswordWithTokenDto,
+} from './dto/email-flows.dto.js';
 
 const COOKIE_NAME = 'access_token';
 
@@ -21,7 +28,10 @@ const COOKIE_OPTIONS: CookieOptions = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private accountEmail: AccountEmailService,
+  ) {}
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
@@ -43,6 +53,34 @@ export class AuthController {
   @Patch('password')
   changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto) {
     return this.authService.changeOwnPassword(user.sub, dto.currentPassword, dto.newPassword);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('notification-settings')
+  updateNotificationSettings(@CurrentUser() user: JwtPayload, @Body() dto: NotificationSettingsDto) {
+    return this.authService.updateNotificationSettings(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('verify-email/send')
+  sendVerification(@CurrentUser() user: JwtPayload) {
+    return this.accountEmail.sendVerification(user.sub);
+  }
+
+  /** Không cần đăng nhập: bấm link trong email là đủ (token chứng minh quyền sở hữu hộp thư). */
+  @Post('verify-email/confirm')
+  confirmEmail(@Body() dto: ConfirmEmailDto) {
+    return this.accountEmail.confirmEmail(dto.token);
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.accountEmail.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordWithTokenDto) {
+    return this.accountEmail.resetPassword(dto.token, dto.newPassword);
   }
 
   @Post('logout')

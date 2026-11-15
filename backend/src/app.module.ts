@@ -16,12 +16,14 @@ import { FollowupsModule } from './followups/followups.module.js';
 import { HostingsModule } from './hostings/hostings.module.js';
 import { LoginEventsModule } from './login-events/login-events.module.js';
 import { TicketsModule } from './tickets/tickets.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    NotificationsModule,
     AuthModule,
     UsersModule,
     WebsitesModule,

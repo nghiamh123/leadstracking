@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { X } from "@phosphor-icons/react";
 import { Sidebar, SidebarContent } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { VerifyEmailBanner } from "./VerifyEmailBanner";
 import { useSession } from "../../lib/session";
 import { isPathAllowed } from "../../lib/nav";
 import { prefetchSharedData } from "../../lib/hooks";
@@ -14,6 +15,7 @@ const titleByPath: Record<string, string> = {
   "/orders": "Đơn hàng",
   "/tickets": "Ticket báo lỗi",
   "/assistant": "Trợ lý AI",
+  "/account": "Tài khoản",
   "/admin/websites": "Quản trị · Website",
   "/admin/hostings": "Quản trị · Hosting",
   "/admin/users": "Quản trị · Người dùng",
@@ -63,6 +65,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={title} onMenuClick={() => setMobileOpen(true)} />
+        <VerifyEmailBanner />
         <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <Outlet />
         </main>

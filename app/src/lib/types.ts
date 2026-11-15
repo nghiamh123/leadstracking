@@ -72,6 +72,7 @@ export interface AppUser {
   role: Role;
   team: string | null;
   status: "active" | "invited" | "disabled";
+  emailVerifiedAt: string | null;
 }
 
 export interface SyncLogEntry {

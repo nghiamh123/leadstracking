@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { buildPageMeta } from '../common/pagination.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   Role,
   TicketStatus,
@@ -56,7 +57,10 @@ const REQUESTER_STATUSES: TicketStatus[] = [TicketStatus.open, TicketStatus.clos
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async findAll(user: JwtPayload, filters: TicketFilters) {
     const search = filters.search?.trim();
@@ -161,7 +165,7 @@ export class TicketsService {
     if (dto.websiteId) await this.assertWebsiteExists(dto.websiteId);
     const assigneeId = await this.resolveAssignee(dto.assigneeId);
 
-    return this.prisma.ticket.update({
+    const updated = await this.prisma.ticket.update({
       where: { id },
       data: {
         title: dto.title?.trim(),
@@ -176,6 +180,9 @@ export class TicketsService {
       },
       include: LIST_INCLUDE,
     });
+    // Không await: email gửi nền, không làm chậm/hỏng request (NotificationsService tự bắt lỗi).
+    void this.notifications.ticketUpdated(user.sub, existing, updated);
+    return updated;
   }
 
   /**
@@ -248,7 +255,7 @@ export class TicketsService {
   }
 
   async addComment(user: JwtPayload, id: string, body: string) {
-    await this.findOne(user, id);
+    const ticket = await this.findOne(user, id);
     const [comment] = await this.prisma.$transaction([
       this.prisma.ticketComment.create({
         data: { ticketId: id, userId: user.sub, body: body.trim() },
@@ -257,6 +264,7 @@ export class TicketsService {
       // Đẩy ticket lên đầu danh sách theo "hoạt động gần nhất".
       this.prisma.ticket.update({ where: { id }, data: { updatedAt: new Date() } }),
     ]);
+    void this.notifications.ticketCommented(user.sub, ticket, comment.body);
     return comment;
   }
 

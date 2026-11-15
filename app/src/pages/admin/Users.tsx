@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Key, Plus } from "@phosphor-icons/react";
+import { EnvelopeSimple, Key, Plus } from "@phosphor-icons/react";
+import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
 import { Pagination, DEFAULT_PAGE_SIZE_OPTIONS } from "../../components/ui/Pagination";
@@ -50,6 +51,18 @@ export function AdminUsers() {
   async function updateRole(id: string, role: Role) {
     await usersApi.updateRole(id, role);
     reload();
+  }
+
+  const [verifySentFor, setVerifySentFor] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<{ id: string; message: string } | null>(null);
+  async function resendVerification(u: AppUser) {
+    setVerifyError(null);
+    try {
+      await usersApi.sendVerification(u.id);
+      setVerifySentFor(u.id);
+    } catch (err) {
+      setVerifyError({ id: u.id, message: err instanceof ApiError ? err.message : "Không gửi được email" });
+    }
   }
 
   async function updateStatus(id: string, status: AppUser["status"]) {
@@ -113,6 +126,7 @@ export function AdminUsers() {
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted">
                 <th className="px-6 py-3 font-medium">Họ tên</th>
                 <th className="px-6 py-3 font-medium">Email</th>
+                <th className="px-6 py-3 font-medium">Xác minh</th>
                 <th className="px-6 py-3 font-medium">Team</th>
                 <th className="px-6 py-3 font-medium">Vai trò</th>
                 <th className="px-6 py-3 font-medium">Trạng thái</th>
@@ -125,6 +139,24 @@ export function AdminUsers() {
                   <tr key={u.id} className="border-b border-border last:border-0">
                     <td className="px-6 py-3 font-medium text-ink-soft">{u.name}</td>
                     <td className="px-6 py-3 text-muted">{u.email}</td>
+                    <td className="px-6 py-3">
+                      {u.emailVerifiedAt ? (
+                        <Badge tone="green">Đã xác minh</Badge>
+                      ) : (
+                        <button
+                          onClick={() => resendVerification(u)}
+                          disabled={verifySentFor === u.id}
+                          title="Gửi lại email xác minh tới người này"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-pale-yellow-ink hover:text-ink disabled:opacity-60"
+                        >
+                          <EnvelopeSimple size={14} />
+                          {verifySentFor === u.id ? "Đã gửi" : "Chưa · gửi lại"}
+                        </button>
+                      )}
+                      {verifyError?.id === u.id && (
+                        <p className="mt-1 max-w-48 text-[11px] text-pale-red-ink">{verifyError.message}</p>
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-muted">{u.team ?? "—"}</td>
                     <td className="px-6 py-3">
                       <select
@@ -174,7 +206,7 @@ export function AdminUsers() {
                 ))}
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-muted">
+                  <td colSpan={7} className="px-6 py-10 text-center text-muted">
                     Đang tải...
                   </td>
                 </tr>

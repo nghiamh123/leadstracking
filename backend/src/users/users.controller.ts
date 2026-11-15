@@ -35,6 +35,11 @@ export class UsersController {
     return this.usersService.updateStatus(id, dto.status);
   }
 
+  @Post(':id/send-verification')
+  sendVerification(@Param('id') id: string) {
+    return this.usersService.sendVerification(id);
+  }
+
   @Patch(':id/password')
   resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
     return this.usersService.resetPassword(id, dto.newPassword);

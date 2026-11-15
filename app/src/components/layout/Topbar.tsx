@@ -1,4 +1,5 @@
 import { List, SignOut } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
 import { roleLabels, useSession } from "../../lib/session";
 
 export function Topbar({
@@ -25,6 +26,11 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-2 border-l border-border pl-3">
+        <Link
+          to="/account"
+          title="Tài khoản & thông báo"
+          className="flex items-center gap-2 rounded-lg p-0.5 pr-1.5 hover:bg-surface-alt"
+        >
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-alt text-xs font-medium text-ink-soft">
           {currentUser.name
             .split(" ")
@@ -36,6 +42,7 @@ export function Topbar({
           <p className="text-sm text-ink-soft">{currentUser.name}</p>
           <p className="text-[11px] text-muted">{roleLabels[currentUser.role]}</p>
         </div>
+        </Link>
         <button
           onClick={() => logout()}
           className="ml-1 rounded-lg p-1.5 text-muted hover:bg-surface-alt hover:text-ink-soft"

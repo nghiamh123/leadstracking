@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TicketsService, detectImageType } from './tickets.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
+import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { JwtPayload } from '../common/types/jwt-payload.js';
 
 const sales: JwtPayload = { sub: 'rep1', email: 's@x.vn', role: 'sales', team: null };
@@ -36,7 +37,12 @@ function setup(opts: { ticket?: Record<string, unknown> | null; assignee?: Recor
     },
     $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
   };
-  return { service: new TicketsService(prisma as unknown as PrismaService), prisma };
+  const notifications = { ticketUpdated: vi.fn().mockResolvedValue(undefined), ticketCommented: vi.fn().mockResolvedValue(undefined) };
+  return {
+    service: new TicketsService(prisma as unknown as PrismaService, notifications as unknown as NotificationsService),
+    prisma,
+    notifications,
+  };
 }
 
 describe('TicketsService', () => {

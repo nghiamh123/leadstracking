@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UserStatus, type Role } from '../generated/prisma/enums.js';
 import type { InviteUserDto } from './dto/invite-user.dto.js';
+import { AccountEmailService } from '../auth/account-email.service.js';
 
 // Không bao giờ trả passwordHash ra ngoài API, kể cả cho admin.
 const PUBLIC_USER_SELECT = {
@@ -12,12 +13,16 @@ const PUBLIC_USER_SELECT = {
   role: true,
   team: true,
   status: true,
+  emailVerifiedAt: true,
   createdAt: true,
 } as const;
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountEmail: AccountEmailService,
+  ) {}
 
   findAll() {
     return this.prisma.user.findMany({
@@ -32,7 +37,7 @@ export class UsersService {
       throw new ConflictException('Email này đã có tài khoản trong hệ thống');
     }
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         name: dto.name,
         email: dto.email,
@@ -43,6 +48,15 @@ export class UsersService {
       },
       select: PUBLIC_USER_SELECT,
     });
+    // Gửi luôn link xác minh để người mới nhận được email thông báo; lỗi gửi không chặn việc tạo tài khoản.
+    await this.accountEmail.sendVerification(user.id).catch(() => undefined);
+    return user;
+  }
+
+  /** Admin gửi lại link xác minh cho người dùng (VD người đó báo không thấy email). */
+  async sendVerification(id: string) {
+    await this.assertExists(id);
+    return this.accountEmail.sendVerification(id);
   }
 
   async updateRole(id: string, role: Role) {
